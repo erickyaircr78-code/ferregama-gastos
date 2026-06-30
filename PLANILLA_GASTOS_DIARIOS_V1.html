@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planilla de Gastos Diarios v7 (Firebase) — Ferregama</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --ink:#1c2420;
+    --paper:#f3f1ea;
+    --card:#ffffff;
+    --line:#dcd6c8;
+    --accent:#b5482a;
+    --accent-dark:#8c3620;
+    --ok:#3f6b46;
+    --ok-bg:#e3f0e1;
+    --warn-bg:#fbe9c8;
+    --warn-text:#8a5d0c;
+    --muted:#7c7669;
+    --field:#f0eee5;
+
+    --c-gasto:#e8c33a;
+    --c-gasto-dark:#6b5510;
+    --c-venta:#e2503c;
+    --c-venta-dark:#7a2014;
+    --c-admin:#7558a6;
+    --c-admin-dark:#372a52;
+    --c-nomina:#4e9456;
+    --c-nomina-dark:#1f4424;
+    --c-vale:#e08a3c;
+    --c-vale-dark:#7a3c0c;
+    --c-otros:#8a8478;
+    --c-otros-dark:#3f3c34;
+  }
+  *{box-sizing:border-box;}
+  @keyframes fadeSlideUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes popIn{from{opacity:0;transform:scale(.94);}to{opacity:1;transform:scale(1);}}
+  @keyframes shimmer{0%{background-position:-200px 0;}100%{background-position:200px 0;}}
+
+  body{
+    margin:0;
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    background:radial-gradient(circle at top left, #f7f5ef 0%, var(--paper) 55%);
+    color:var(--ink);
+    -webkit-font-smoothing:antialiased;
+  }
+  .topbar{
+    background:linear-gradient(135deg,#1c2420 0%,#283a30 100%);
+    color:var(--paper);
+    padding:16px 28px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    position:sticky;
+    top:0;
+    z-index:20;
+    box-shadow:0 4px 18px rgba(0,0,0,.18);
+  }
+  .topbar h1{margin:0;font-size:19px;font-weight:700;}
+  .topbar .eyebrow{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#bfb8a4;margin:0;}
+  .tabs{display:flex;gap:4px;}
+  .tab-btn{
+    padding:9px 18px;
+    background:transparent;
+    border:1px solid #46504a;
+    color:#cfc8b6;
+    border-radius:8px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    transition:all .2s ease;
+  }
+  .tab-btn:hover{background:rgba(255,255,255,.07);transform:translateY(-1px);}
+  .tab-btn.active{background:linear-gradient(135deg,var(--accent),var(--accent-dark));border-color:var(--accent);color:#fff;box-shadow:0 3px 10px rgba(181,72,42,.4);}
+
+  .wrap{max-width:1280px;margin:0 auto;padding:22px 28px 60px;}
+  .view{display:none;}
+  .view.active{display:block;animation:fadeSlideUp .35s ease;}
+
+  .grid2{display:grid;grid-template-columns:1.1fr 1fr;gap:18px;align-items:start;}
+  @media(max-width:900px){.grid2{grid-template-columns:1fr;}}
+
+  .caja-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:20px;align-items:center;}
+  @media(max-width:700px){.caja-grid{grid-template-columns:1fr;}}
+  .caja-resumen{display:flex;gap:24px;}
+  .caja-label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px;}
+  .caja-valor{font-size:22px;font-weight:800;margin:0;transition:color .25s ease;}
+  .caja-valor.negativo{color:var(--accent);}
+  .caja-valor.positivo{color:var(--ok);}
+  #cajaCard{
+    background:linear-gradient(135deg,#fff 0%,#fdf9f3 100%);
+    border:1px solid var(--line);
+    position:relative;
+    overflow:hidden;
+  }
+  #cajaCard::before{
+    content:'';position:absolute;top:0;left:0;width:5px;height:100%;
+    background:linear-gradient(180deg,var(--accent),var(--c-gasto));
+  }
+
+  .comprobante-zone{
+    border:1.5px dashed var(--line);border-radius:9px;padding:14px;text-align:center;
+    background:var(--field);cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;
+    transition:all .2s ease;
+  }
+  .comprobante-zone:hover{border-color:var(--accent);background:#fff;transform:translateY(-1px);box-shadow:0 4px 12px rgba(181,72,42,.12);}
+  .comprobante-zone.has-file{border-color:var(--ok);color:var(--ok);background:var(--ok-bg);animation:popIn .3s ease;}
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:18px;
+    box-shadow:0 2px 10px rgba(28,36,32,.05);
+    transition:box-shadow .25s ease;
+    animation:fadeSlideUp .4s ease;
+  }
+  .card:hover{box-shadow:0 6px 20px rgba(28,36,32,.09);}
+  .card-title{
+    font-size:13px;font-weight:700;color:var(--accent-dark);
+    text-transform:uppercase;letter-spacing:.06em;margin:0 0 16px;
+  }
+
+  label{display:block;font-size:13px;font-weight:600;margin:0 0 6px;}
+  .fg{margin-bottom:14px;}
+  input,select{
+    width:100%;padding:11px 12px;border:1.5px solid var(--line);
+    border-radius:8px;background:var(--field);font-size:15px;color:var(--ink);font-family:inherit;
+    transition:border-color .2s ease, background .2s ease, box-shadow .2s ease;
+  }
+  input:focus,select:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(181,72,42,.1);}
+
+  .tipo-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:14px;}
+  .tipo-btn{
+    padding:12px 6px;border-radius:9px;border:2px solid var(--line);
+    background:var(--field);font-size:12.5px;font-weight:700;cursor:pointer;text-align:center;
+    color:var(--muted);transition:all .18s ease;
+  }
+  .tipo-btn:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(28,36,32,.1);}
+  .tipo-btn.active{animation:popIn .25s ease;}
+  .tipo-btn.active[data-tipo="Gasto"]{background:var(--c-gasto);border-color:var(--c-gasto-dark);color:var(--c-gasto-dark);}
+  .tipo-btn.active[data-tipo="Gastos de venta"]{background:var(--c-venta);border-color:var(--c-venta-dark);color:#fff;}
+  .tipo-btn.active[data-tipo="Administrativo"]{background:var(--c-admin);border-color:var(--c-admin-dark);color:#fff;}
+  .tipo-btn.active[data-tipo="Nómina"]{background:var(--c-nomina);border-color:var(--c-nomina-dark);color:#fff;}
+  .tipo-btn.active[data-tipo="Vale/Préstamo"]{background:var(--c-vale);border-color:var(--c-vale-dark);color:#fff;}
+  .tipo-btn.active[data-tipo="Otros"]{background:var(--c-otros);border-color:var(--c-otros-dark);color:#fff;}
+
+  .amount-wrap{position:relative;}
+  .amount-wrap span{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-weight:700;color:var(--muted);font-size:17px;}
+  .amount-wrap input{padding-left:28px;font-size:19px;font-weight:700;}
+
+  .btn-submit{
+    width:100%;padding:14px;background:linear-gradient(135deg,var(--accent),var(--accent-dark));color:#fff;border:none;
+    border-radius:9px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;
+    transition:transform .15s ease, box-shadow .15s ease;box-shadow:0 4px 14px rgba(181,72,42,.3);
+  }
+  .btn-submit:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(181,72,42,.4);}
+  .btn-submit:active{transform:translateY(0);background:var(--accent-dark);}
+  .btn-secondary{
+    padding:10px 16px;background:transparent;border:1.5px solid var(--line);color:var(--ink);
+    border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .18s ease;
+  }
+  .btn-secondary:hover{background:var(--field);transform:translateY(-1px);}
+  .status{text-align:center;font-size:13px;font-weight:600;margin-top:10px;min-height:16px;}
+  .status.ok{color:var(--ok);}
+  .status.err{color:var(--accent);}
+
+  .metrics{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px;}
+  .metric{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;
+    transition:transform .2s ease, box-shadow .2s ease;animation:fadeSlideUp .4s ease;
+  }
+  .metric:hover{transform:translateY(-3px);box-shadow:0 8px 18px rgba(28,36,32,.1);}
+  .metric .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px;}
+  .metric .value{font-size:21px;font-weight:800;margin:0;transition:color .25s ease;}
+  .metric.gasto .value{color:var(--c-gasto-dark);}
+  .metric.venta .value{color:var(--c-venta-dark);}
+  .metric.admin .value{color:var(--c-admin-dark);}
+  .metric.otros .value{color:var(--c-otros-dark);}
+  .metric.nomina .value{color:var(--c-nomina-dark);}
+  .metric.vale .value{color:var(--c-vale-dark);}
+
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;align-items:center;}
+  .filters select,.filters input{width:auto;padding:8px 10px;font-size:13px;}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;padding:9px 8px;background:var(--field);color:var(--muted);
+    font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;
+    border-bottom:2px solid var(--line);position:sticky;top:0;
+  }
+  td{padding:9px 8px;border-bottom:1px solid var(--line);transition:background .15s ease;}
+  tr{transition:background .15s ease;animation:fadeSlideUp .3s ease;}
+  tr:hover td{background:#faf8f3;}
+  .badge{
+    padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;display:inline-block;
+    box-shadow:0 1px 4px rgba(0,0,0,.12);
+  }
+  .badge.Gasto{background:var(--c-gasto);color:var(--c-gasto-dark);}
+  .badge.GV{background:var(--c-venta);color:#fff;}
+  .badge.Administrativo{background:var(--c-admin);color:#fff;}
+  .badge.Otros{background:var(--c-otros);color:#fff;}
+  .badge.Nómina{background:var(--c-nomina);color:#fff;}
+  .badge.VP{background:var(--c-vale);color:#fff;}
+  .amount-cell{font-weight:700;text-align:right;}
+  .empty-row td{text-align:center;color:var(--muted);padding:30px 0;}
+  .icon-btn{border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--muted);padding:4px 7px;border-radius:6px;transition:all .15s ease;}
+  .icon-btn:hover{background:var(--field);color:var(--accent);transform:scale(1.15);}
+
+  .table-wrap{overflow-x:auto;max-height:560px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:10px;}
+
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(30px) scale(.9);
+    background:linear-gradient(135deg,#1c2420,#283a30);color:#fff;padding:13px 22px;border-radius:10px;font-size:13.5px;
+    font-weight:600;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;z-index:50;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1);}
+
+  .config-banner{
+    background:#fce8d8;border:1px solid #e0a878;color:#7a3d12;font-size:12.5px;
+    padding:11px 14px;border-radius:10px;margin-bottom:16px;line-height:1.45;
+  }
+
+  .modal-overlay{
+    position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(28,36,32,.55);
+    display:none;align-items:center;justify-content:center;z-index:100;
+    backdrop-filter:blur(2px);
+  }
+  .modal-overlay.show{display:flex;animation:fadeSlideUp .15s ease;}
+  .modal-box{
+    background:var(--card);border-radius:14px;padding:24px;width:100%;max-width:480px;
+    max-height:88vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,.3);
+    animation:popIn .25s cubic-bezier(.34,1.56,.64,1);
+  }
+  .modal-box h2{margin:0 0 16px;font-size:17px;}
+  .modal-close{float:right;border:none;background:transparent;font-size:18px;cursor:pointer;color:var(--muted);transition:transform .15s ease;}
+  .modal-close:hover{transform:rotate(90deg);color:var(--accent);}
+
+  .suc-overlay{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:radial-gradient(circle at 30% 20%, #283a30 0%, var(--ink) 70%);
+    display:flex;align-items:center;justify-content:center;z-index:200;
+  }
+  .suc-overlay-box{
+    background:var(--card);border-radius:16px;padding:36px 32px;max-width:420px;width:90%;text-align:center;
+    box-shadow:0 25px 60px rgba(0,0,0,.4);animation:popIn .4s cubic-bezier(.34,1.56,.64,1);
+  }
+  .suc-overlay-box h2{margin:0 0 6px;font-size:19px;}
+  .suc-overlay-box p{font-size:13.5px;color:var(--muted);margin:0 0 22px;}
+  .suc-overlay-grid{display:flex;flex-direction:column;gap:10px;}
+  .suc-overlay-btn{
+    padding:16px;border-radius:10px;border:2px solid var(--line);background:var(--field);
+    font-size:16px;font-weight:700;cursor:pointer;color:var(--ink);transition:all .2s ease;
+  }
+  .suc-overlay-btn:hover{border-color:var(--accent);background:#fff;transform:translateY(-2px) scale(1.02);box-shadow:0 6px 16px rgba(181,72,42,.18);}
+
+  .suc-fija{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:11px 14px;background:linear-gradient(135deg,var(--field),#fff);border:1.5px solid var(--line);border-radius:8px;
+    font-size:14px;font-weight:700;margin-bottom:14px;
+  }
+  .suc-fija span:first-child{color:var(--accent-dark);}
+  .suc-fija .cambiar{font-size:11.5px;font-weight:600;color:var(--muted);cursor:default;}
+
+  [data-tooltip]{position:relative;}
+  [data-tooltip]:hover::after{
+    content:attr(data-tooltip);
+    position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+    background:linear-gradient(135deg,#1c2420,#283a30);color:#fff;font-size:12px;font-weight:500;
+    padding:8px 11px;border-radius:7px;white-space:normal;width:200px;line-height:1.4;
+    z-index:30;text-align:left;box-shadow:0 8px 20px rgba(0,0,0,.25);
+    animation:popIn .15s ease;
+  }
+  [data-tooltip]:hover::before{
+    content:'';position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+    border:6px solid transparent;border-top-color:#1c2420;z-index:30;
+  }
+</style>
+</head>
+<body>
+
+<div class="suc-overlay" id="sucOverlay">
+  <div class="suc-overlay-box">
+    <h2>¿Desde qué sucursal vas a capturar?</h2>
+    <p>Esta sucursal se queda fija mientras esta pantalla esté abierta. Para cambiarla, cierra la pestaña y vuelve a entrar.</p>
+    <div class="suc-overlay-grid">
+      <button class="suc-overlay-btn" data-suc="CDMX">CDMX</button>
+      <button class="suc-overlay-btn" data-suc="Morelos">Morelos</button>
+      <button class="suc-overlay-btn" data-suc="Puebla">Puebla</button>
+    </div>
+  </div>
+</div>
+
+<div class="topbar">
+  <div>
+    <p class="eyebrow">Ferregama · Control de gastos</p>
+    <h1>Planilla de gastos diarios</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span id="versionBadge" style="font-size:10.5px;color:#8a9a8d;border:1px solid #46504a;padding:3px 9px;border-radius:12px;">v7 · Firebase</span>
+    <div class="tabs">
+      <button class="tab-btn active" data-view="captura">Captura</button>
+      <button class="tab-btn" data-view="mis-gastos">Mis gastos</button>
+      <button class="tab-btn" data-view="consolidado">Consolidado</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="config-banner" id="fileProtocolBanner" style="display:none;background:#fbdede;border-color:#d98a8a;color:#7a1f1f;">
+    <strong>⚠ Este archivo se abrió directamente (doble clic), no a través del servidor.</strong>
+    Así no puede conectarse a la base de datos. Cierra esta pestaña y entra escribiendo
+    <code style="background:#fff;padding:2px 6px;border-radius:4px;">http://localhost:8000/PLANILLA_GASTOS_DIARIOS_V1.html</code>
+    en la barra de direcciones, con la ventana del servidor (símbolo del sistema) abierta.
+  </div>
+
+  <div class="view active" id="view-captura">
+
+    <div class="card" id="cajaCard">
+      <p class="card-title">Caja del día — <span id="cajaSucTexto">CDMX</span> · <span id="cajaFechaTexto"></span></p>
+      <div class="caja-grid">
+        <div class="fg" style="margin-bottom:0;">
+          <label for="saldoInicial">Saldo inicial de hoy (opcional)</label>
+          <div class="amount-wrap">
+            <span>$</span>
+            <input type="number" id="saldoInicial" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+        <div class="caja-resumen">
+          <div><p class="caja-label">Gastado hoy</p><p class="caja-valor" id="cajaGastado">$0</p></div>
+          <div><p class="caja-label">Debería quedar</p><p class="caja-valor" id="cajaRestante">—</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid2">
+
+      <div class="card">
+        <p class="card-title">Tipo de movimiento</p>
+        <div class="tipo-grid" id="tipoGrid">
+          <button type="button" class="tipo-btn active" data-tipo="Gasto" data-tooltip="Camionetas, reparaciones, mantenimiento de vehículos, casetas, gasolina y todo lo necesario para que la operación funcione.">Gasto<br>operativo</button>
+          <button type="button" class="tipo-btn" data-tipo="Gastos de venta" data-tooltip="Todo lo que se le da a los vendedores: gratificaciones, comisiones, viáticos y apoyos relacionados con ventas.">Gastos<br>de venta</button>
+          <button type="button" class="tipo-btn" data-tipo="Administrativo" data-tooltip="Todo lo que se ocupa en oficina: papelería, limpieza, servicios de oficina y gastos administrativos en general.">Administrativo</button>
+          <button type="button" class="tipo-btn" data-tipo="Nómina" data-tooltip="Nómina de todas las áreas de la empresa.">Nómina</button>
+          <button type="button" class="tipo-btn" data-tipo="Vale/Préstamo" data-tooltip="Dinero adelantado a cualquier persona que lo solicite, a cuenta de su nómina semanal.">Vale /<br>Préstamo</button>
+          <button type="button" class="tipo-btn" data-tipo="Otros" data-tooltip="Movimientos que no se identifican claramente en ninguna de las categorías anteriores.">Otros</button>
+        </div>
+
+        <p class="card-title" style="margin-top:18px;">Sucursal</p>
+        <div class="suc-fija">
+          <span id="sucFijaTexto">CDMX</span>
+          <span class="cambiar">Para cambiarla, cierra y vuelve a abrir esta pantalla</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">Detalle</p>
+
+        <div class="fg">
+          <label for="persona">A quién se le dio el dinero / nombre</label>
+          <input type="text" id="persona" placeholder="Nombre de la persona" list="personasList" autocomplete="off">
+          <datalist id="personasList"></datalist>
+        </div>
+
+        <div class="fg">
+          <label for="monto">Monto</label>
+          <div class="amount-wrap">
+            <span>$</span>
+            <input type="number" id="monto" inputmode="decimal" step="0.01" placeholder="0.00">
+          </div>
+        </div>
+
+        <div class="fg">
+          <label for="concepto">Concepto</label>
+          <input type="text" id="concepto" placeholder="Ej. Casetas, gasolina, reparación..." list="conceptosList" autocomplete="off">
+          <datalist id="conceptosList">
+            <option value="Casetas"><option value="Gasolina"><option value="Gratificación choferes">
+            <option value="Taxi choferes"><option value="Comida choferes"><option value="Propina carga de gas">
+            <option value="Recarga celular"><option value="Productos de limpieza">
+            <option value="Reparación / ajuste de frenos camioneta"><option value="Cambio de balatas y aceite">
+            <option value="Verificación vehicular"><option value="Garrafones de agua"><option value="Ayudante de chofer">
+            <option value="Tránsito / multas">
+            <option value="Papelería"><option value="Tóner / cartuchos de impresora"><option value="Material de limpieza oficina">
+            <option value="Café / agua para oficina"><option value="Mensajería / paquetería"><option value="Fotocopias">
+            <option value="Mantenimiento de equipo de cómputo"><option value="Artículos de oficina varios">
+            <option value="Otro (especifica)">
+          </datalist>
+        </div>
+
+        <div class="fg">
+          <label for="comprobanteInput">Comprobante (opcional)</label>
+          <div class="comprobante-zone" id="comprobanteZone">
+            <span id="comprobanteTexto">Tomar foto o subir imagen / PDF del ticket</span>
+            <input type="file" id="comprobanteInput" accept="image/*,application/pdf" style="display:none;">
+          </div>
+          <div id="comprobantePreviewWrap" style="display:none;margin-top:8px;">
+            <img id="comprobantePreviewImg" style="display:none;max-height:120px;border-radius:8px;border:1px solid var(--line);">
+            <div id="comprobantePreviewPdf" style="display:none;font-size:13px;color:var(--ok);font-weight:600;">📄 PDF adjuntado</div>
+            <button type="button" class="icon-btn" id="quitarComprobanteBtn" style="margin-top:4px;">Quitar comprobante</button>
+          </div>
+        </div>
+
+        <div class="fg" style="margin-bottom:0;">
+          <label for="capturista">Quién captura</label>
+          <input type="text" id="capturista" placeholder="Tu nombre" autocomplete="off">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:0;">
+      <button class="btn-submit" id="submitBtn">Registrar movimiento</button>
+      <div class="status" id="statusMsg"></div>
+    </div>
+  </div>
+
+  <div class="view" id="view-mis-gastos">
+    <div class="card">
+      <p class="card-title">Lo que ha capturado <span id="misGastosSucTexto">CDMX</span></p>
+      <div class="filters" style="margin-bottom:14px;">
+        <input type="date" id="misFiltroFecha">
+        <button class="btn-secondary" id="misHoyBtn">Solo hoy</button>
+        <button class="btn-secondary" id="misClearBtn">Quitar filtro</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th><th>Tipo</th><th>Persona</th>
+              <th>Concepto</th><th style="text-align:right;">Monto</th><th>Capturó</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="tablaMisGastos"></tbody>
+        </table>
+      </div>
+      <p style="text-align:right;font-size:14px;font-weight:700;margin:14px 0 0;">Total: <span id="misGastosTotal">$0</span></p>
+    </div>
+  </div>
+
+  <div class="view" id="view-consolidado">
+    <div class="metrics">
+      <div class="metric gasto"><p class="label">Gasto operativo</p><p class="value" id="totGasto">$0</p></div>
+      <div class="metric venta"><p class="label">Gastos de venta</p><p class="value" id="totVenta">$0</p></div>
+      <div class="metric admin"><p class="label">Administrativo</p><p class="value" id="totAdmin">$0</p></div>
+      <div class="metric nomina"><p class="label">Nómina</p><p class="value" id="totNomina">$0</p></div>
+      <div class="metric vale"><p class="label">Vales / préstamos</p><p class="value" id="totVale">$0</p></div>
+      <div class="metric otros"><p class="label">Otros</p><p class="value" id="totOtros">$0</p></div>
+    </div>
+
+    <div class="card">
+      <p class="card-title">Gastos por persona que captura</p>
+      <div class="table-wrap" style="max-height:220px;">
+        <table>
+          <thead><tr><th>Capturó</th><th style="text-align:center;">Movimientos</th><th style="text-align:right;">Total</th></tr></thead>
+          <tbody id="tablaPorPersona"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filters">
+        <select id="filterTipo">
+          <option value="">Todos los tipos</option>
+          <option value="Gasto">Gasto operativo</option>
+          <option value="Gastos de venta">Gastos de venta</option>
+          <option value="Administrativo">Administrativo</option>
+          <option value="Nómina">Nómina</option>
+          <option value="Vale/Préstamo">Vale / Préstamo</option>
+          <option value="Otros">Otros</option>
+        </select>
+        <select id="filterSuc">
+          <option value="">Todas las sucursales</option>
+          <option value="CDMX">CDMX</option>
+          <option value="Morelos">Morelos</option>
+          <option value="Puebla">Puebla</option>
+        </select>
+        <select id="filterCapturista">
+          <option value="">Todos los capturistas</option>
+        </select>
+        <input type="date" id="filterFecha">
+        <button class="btn-secondary" id="clearFilters">Limpiar filtros</button>
+      </div>
+      <div>
+        <button class="btn-secondary" id="exportBtn">Exportar a Excel</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th><th>Tipo</th><th>Sucursal</th><th>Persona</th>
+            <th>Concepto</th><th style="text-align:right;">Monto</th><th>Capturó</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="tablaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal-overlay" id="modalEdicion">
+  <div class="modal-box">
+    <button class="modal-close" id="cerrarModal">✕</button>
+    <h2>Editar movimiento</h2>
+
+    <div class="fg">
+      <label for="edTipo">Tipo de movimiento</label>
+      <select id="edTipo">
+        <option value="Gasto">Gasto operativo</option>
+        <option value="Gastos de venta">Gastos de venta</option>
+        <option value="Administrativo">Administrativo</option>
+        <option value="Nómina">Nómina</option>
+        <option value="Vale/Préstamo">Vale / Préstamo</option>
+        <option value="Otros">Otros</option>
+      </select>
+    </div>
+
+    <div class="fg">
+      <label for="edSucursal">Sucursal</label>
+      <select id="edSucursal">
+        <option value="CDMX">CDMX</option>
+        <option value="Morelos">Morelos</option>
+        <option value="Puebla">Puebla</option>
+      </select>
+    </div>
+
+    <div class="fg">
+      <label for="edPersona">A quién se le dio el dinero / nombre</label>
+      <input type="text" id="edPersona">
+    </div>
+
+    <div class="fg">
+      <label for="edMonto">Monto</label>
+      <div class="amount-wrap">
+        <span>$</span>
+        <input type="number" id="edMonto" step="0.01">
+      </div>
+    </div>
+
+    <div class="fg">
+      <label for="edConcepto">Concepto</label>
+      <input type="text" id="edConcepto">
+    </div>
+
+    <div class="fg">
+      <label for="edFecha">Fecha</label>
+      <input type="date" id="edFecha">
+    </div>
+
+    <div class="fg">
+      <label for="edCapturista">Quién captura</label>
+      <input type="text" id="edCapturista">
+    </div>
+
+    <div class="fg" style="margin-bottom:0;">
+      <label>Comprobante</label>
+      <div id="edComprobanteActual" style="margin-bottom:8px;"></div>
+      <div class="comprobante-zone" id="edComprobanteZone">
+        <span id="edComprobanteTexto">Tomar foto o subir imagen / PDF del ticket</span>
+        <input type="file" id="edComprobanteInput" accept="image/*,application/pdf" style="display:none;">
+      </div>
+      <button type="button" class="icon-btn" id="edQuitarComprobanteBtn" style="margin-top:6px;">Quitar comprobante</button>
+    </div>
+
+    <button class="btn-submit" id="guardarEdicionBtn" style="margin-top:16px;">Guardar cambios</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"><span id="toastText"></span></div>
+
+<script>
+if (window.location.protocol === 'file:') {
+  document.getElementById('fileProtocolBanner').style.display = 'block';
+}
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",
+  authDomain: "ferregama-gastos.firebaseapp.com",
+  projectId: "ferregama-gastos",
+  storageBucket: "ferregama-gastos.firebasestorage.app",
+  messagingSenderId: "561677307493",
+  appId: "1:561677307493:web:adb5284746c1dac3e3408c"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+const COLECCION = 'movimientos';
+
+let movimientos = [];
+
+function suscribirMovimientos() {
+  db.collection(COLECCION).orderBy('creadoEn', 'desc').onSnapshot((snapshot) => {
+    movimientos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderTabla();
+    renderMisGastos();
+    renderCajaDelDia();
+  }, (error) => {
+    console.error('Error leyendo movimientos:', error);
+    mostrarToast('Error de conexión con la base de datos');
+  });
+}
+
+async function agregarMovimientoDB(mov) {
+  await db.collection(COLECCION).add({
+    ...mov,
+    creadoEn: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function actualizarMovimientoDB(id, cambios) {
+  await db.collection(COLECCION).doc(id).update(cambios);
+}
+
+async function eliminarMovimientoDB(id) {
+  await db.collection(COLECCION).doc(id).delete();
+}
+
+let tipoSeleccionado = 'Gasto';
+let sucursalSeleccionada = null;
+
+function hoyISO() {
+  const d = new Date();
+  const offset = d.getTimezoneOffset();
+  return new Date(d.getTime() - offset * 60000).toISOString().split('T')[0];
+}
+
+function formatoMoneda(n) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+}
+
+function badgeClase(tipo) {
+  if (tipo === 'Vale/Préstamo') return 'VP';
+  if (tipo === 'Gastos de venta') return 'GV';
+  return tipo;
+}
+
+function claveSaldoInicial(suc, fecha) {
+  return `fg_saldo_inicial_${suc}_${fecha}`;
+}
+
+function calcularGastadoHoy(suc, fecha) {
+  return movimientos
+    .filter(m => m.sucursal === suc && m.fecha === fecha)
+    .reduce((a, m) => a + m.monto, 0);
+}
+
+function renderCajaDelDia() {
+  if (!sucursalSeleccionada) return;
+  const fecha = hoyISO();
+  document.getElementById('cajaSucTexto').textContent = sucursalSeleccionada;
+  document.getElementById('cajaFechaTexto').textContent = fecha;
+
+  const gastado = calcularGastadoHoy(sucursalSeleccionada, fecha);
+  const elGastado = document.getElementById('cajaGastado');
+  elGastado.textContent = formatoMoneda(gastado);
+  elGastado.style.animation = 'none';
+  requestAnimationFrame(() => { elGastado.style.animation = 'popIn .3s ease'; });
+
+  const saldoGuardado = localStorage.getItem(claveSaldoInicial(sucursalSeleccionada, fecha));
+  const inputSaldo = document.getElementById('saldoInicial');
+  if (saldoGuardado !== null && document.activeElement !== inputSaldo) {
+    inputSaldo.value = saldoGuardado;
+  }
+
+  const elRestante = document.getElementById('cajaRestante');
+  if (saldoGuardado !== null && saldoGuardado !== '') {
+    const restante = parseFloat(saldoGuardado) - gastado;
+    elRestante.textContent = formatoMoneda(restante);
+    elRestante.className = 'caja-valor ' + (restante < 0 ? 'negativo' : 'positivo');
+  } else {
+    elRestante.textContent = '—';
+    elRestante.className = 'caja-valor';
+  }
+}
+
+document.getElementById('saldoInicial').addEventListener('input', (e) => {
+  if (!sucursalSeleccionada) return;
+  const fecha = hoyISO();
+  if (e.target.value === '') {
+    localStorage.removeItem(claveSaldoInicial(sucursalSeleccionada, fecha));
+  } else {
+    localStorage.setItem(claveSaldoInicial(sucursalSeleccionada, fecha), e.target.value);
+  }
+  renderCajaDelDia();
+});
+
+function fijarSucursal(suc) {
+  sucursalSeleccionada = suc;
+  sessionStorage.setItem('fg_sucursal_sesion', suc);
+  document.getElementById('sucOverlay').style.display = 'none';
+  document.getElementById('sucFijaTexto').textContent = suc;
+  document.getElementById('misGastosSucTexto').textContent = suc;
+
+  renderCajaDelDia();
+}
+
+document.querySelectorAll('.suc-overlay-btn').forEach(btn => {
+  btn.addEventListener('click', () => fijarSucursal(btn.dataset.suc));
+});
+
+const sucursalGuardada = sessionStorage.getItem('fg_sucursal_sesion');
+if (sucursalGuardada) {
+  fijarSucursal(sucursalGuardada);
+} else {
+  document.getElementById('sucOverlay').style.display = 'flex';
+}
+
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if (btn.dataset.view === 'consolidado') renderTabla();
+    if (btn.dataset.view === 'mis-gastos') renderMisGastos();
+  });
+});
+
+document.querySelectorAll('.tipo-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tipo-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    tipoSeleccionado = btn.dataset.tipo;
+  });
+});
+
+function guardarSugerenciaPersona(valor) {
+  let lista = JSON.parse(localStorage.getItem('fg_personas') || '[]');
+  if (valor && !lista.includes(valor)) {
+    lista.unshift(valor);
+    lista = lista.slice(0, 20);
+    localStorage.setItem('fg_personas', JSON.stringify(lista));
+  }
+  const dl = document.getElementById('personasList');
+  dl.innerHTML = lista.map(v => `<option value="${v}">`).join('');
+}
+guardarSugerenciaPersona(null);
+
+const ultimoCapturista = localStorage.getItem('fg_ultimo_capturista');
+if (ultimoCapturista) document.getElementById('capturista').value = ultimoCapturista;
+
+function mostrarToast(texto) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastText').textContent = texto;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2400);
+}
+
+let comprobanteActual = null;
+
+function comprimirImagen(file, callback) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1000;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', 0.6));
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function mostrarComprobantePreview(dataUrl, tipo) {
+  const zone = document.getElementById('comprobanteZone');
+  const wrap = document.getElementById('comprobantePreviewWrap');
+  const imgEl = document.getElementById('comprobantePreviewImg');
+  const pdfEl = document.getElementById('comprobantePreviewPdf');
+
+  zone.classList.add('has-file');
+  document.getElementById('comprobanteTexto').textContent = 'Comprobante listo ✓ (toca para cambiarlo)';
+  wrap.style.display = 'block';
+
+  if (tipo === 'imagen') {
+    imgEl.src = dataUrl;
+    imgEl.style.display = 'block';
+    pdfEl.style.display = 'none';
+  } else {
+    imgEl.style.display = 'none';
+    pdfEl.style.display = 'block';
+  }
+}
+
+function quitarComprobante() {
+  comprobanteActual = null;
+  document.getElementById('comprobanteInput').value = '';
+  document.getElementById('comprobanteZone').classList.remove('has-file');
+  document.getElementById('comprobanteTexto').textContent = 'Tomar foto o subir imagen / PDF del ticket';
+  document.getElementById('comprobantePreviewWrap').style.display = 'none';
+}
+
+document.getElementById('comprobanteZone').addEventListener('click', () => {
+  document.getElementById('comprobanteInput').click();
+});
+
+document.getElementById('comprobanteInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (file.type === 'application/pdf') {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      comprobanteActual = { tipo: 'pdf', data: ev.target.result, nombre: file.name };
+      mostrarComprobantePreview(null, 'pdf');
+    };
+    reader.readAsDataURL(file);
+  } else if (file.type.startsWith('image/')) {
+    comprimirImagen(file, (dataUrl) => {
+      comprobanteActual = { tipo: 'imagen', data: dataUrl, nombre: file.name };
+      mostrarComprobantePreview(dataUrl, 'imagen');
+    });
+  } else {
+    mostrarToast("Solo se permiten imágenes o PDF");
+  }
+});
+
+document.getElementById('quitarComprobanteBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  quitarComprobante();
+});
+
+document.getElementById('submitBtn').addEventListener('click', async () => {
+  const persona = document.getElementById('persona').value.trim();
+  const monto = parseFloat(document.getElementById('monto').value);
+  const concepto = document.getElementById('concepto').value.trim();
+  const capturista = document.getElementById('capturista').value.trim();
+  const statusMsg = document.getElementById('statusMsg');
+  const btn = document.getElementById('submitBtn');
+
+  if (!sucursalSeleccionada) {
+    statusMsg.textContent = "Selecciona tu sucursal primero.";
+    statusMsg.className = "status err";
+    return;
+  }
+  if (!monto || monto <= 0 || !concepto || !capturista) {
+    statusMsg.textContent = "Falta monto, concepto o quién captura.";
+    statusMsg.className = "status err";
+    return;
+  }
+
+  const mov = {
+    fecha: hoyISO(),
+    tipo: tipoSeleccionado,
+    sucursal: sucursalSeleccionada,
+    persona: persona || '',
+    concepto: concepto,
+    monto: monto,
+    capturista: capturista,
+    comprobante: comprobanteActual
+  };
+
+  btn.disabled = true;
+  btn.textContent = "Guardando...";
+
+  try {
+    await agregarMovimientoDB(mov);
+    guardarSugerenciaPersona(persona);
+    localStorage.setItem('fg_ultimo_capturista', capturista);
+
+    mostrarToast(`Registrado: ${concepto} · ${formatoMoneda(monto)}`);
+    statusMsg.textContent = "Movimiento guardado.";
+    statusMsg.className = "status ok";
+
+    document.getElementById('persona').value = '';
+    document.getElementById('monto').value = '';
+    document.getElementById('concepto').value = '';
+    document.getElementById('concepto').focus();
+    quitarComprobante();
+  } catch (err) {
+    console.error(err);
+    if (String(err).includes('longer than') || String(err).includes('1048487')) {
+      statusMsg.textContent = "La foto del comprobante es muy grande. Intenta con otra foto o sin comprobante.";
+    } else {
+      statusMsg.textContent = "Error al guardar. Verifica tu conexión a internet.";
+    }
+    statusMsg.className = "status err";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Registrar movimiento";
+  }
+});
+
+function calcularTotales(lista) {
+  const tot = { Gasto: 0, 'Gastos de venta': 0, 'Administrativo': 0, 'Nómina': 0, 'Vale/Préstamo': 0, 'Otros': 0 };
+  lista.forEach(m => { tot[m.tipo] = (tot[m.tipo] || 0) + m.monto; });
+  return tot;
+}
+
+function aplicarFiltros() {
+  const tipo = document.getElementById('filterTipo').value;
+  const suc = document.getElementById('filterSuc').value;
+  const fecha = document.getElementById('filterFecha').value;
+  const capturista = document.getElementById('filterCapturista').value;
+  return movimientos.filter(m =>
+    (!tipo || m.tipo === tipo) &&
+    (!suc || m.sucursal === suc) &&
+    (!fecha || m.fecha === fecha) &&
+    (!capturista || m.capturista === capturista)
+  );
+}
+
+function poblarFiltroCapturistas() {
+  const select = document.getElementById('filterCapturista');
+  const actual = select.value;
+  const nombres = [...new Set(movimientos.map(m => m.capturista).filter(Boolean))].sort();
+  select.innerHTML = '<option value="">Todos los capturistas</option>' +
+    nombres.map(n => `<option value="${n}">${n}</option>`).join('');
+  select.value = actual;
+}
+
+function renderPorPersona(filtrados) {
+  const porPersona = {};
+  filtrados.forEach(m => {
+    if (!porPersona[m.capturista]) porPersona[m.capturista] = { total: 0, count: 0 };
+    porPersona[m.capturista].total += m.monto;
+    porPersona[m.capturista].count += 1;
+  });
+  const tbody = document.getElementById('tablaPorPersona');
+  const nombres = Object.keys(porPersona).sort((a,b) => porPersona[b].total - porPersona[a].total);
+  if (!nombres.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="3">Sin movimientos en este filtro.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = nombres.map(n => `
+    <tr>
+      <td>${n}</td>
+      <td style="text-align:center;">${porPersona[n].count}</td>
+      <td class="amount-cell">${formatoMoneda(porPersona[n].total)}</td>
+    </tr>
+  `).join('');
+}
+
+async function eliminarMovimiento(id) {
+  try {
+    await eliminarMovimientoDB(id);
+    mostrarToast("Movimiento eliminado");
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Error al eliminar. Verifica tu conexión.");
+  }
+}
+
+function renderTabla() {
+  poblarFiltroCapturistas();
+  const filtrados = aplicarFiltros();
+  renderPorPersona(filtrados);
+  const tot = calcularTotales(filtrados);
+  document.getElementById('totGasto').textContent = formatoMoneda(tot['Gasto']);
+  document.getElementById('totVenta').textContent = formatoMoneda(tot['Gastos de venta']);
+  document.getElementById('totAdmin').textContent = formatoMoneda(tot['Administrativo']);
+  document.getElementById('totNomina').textContent = formatoMoneda(tot['Nómina']);
+  document.getElementById('totVale').textContent = formatoMoneda(tot['Vale/Préstamo']);
+  document.getElementById('totOtros').textContent = formatoMoneda(tot['Otros']);
+
+  const tbody = document.getElementById('tablaBody');
+  if (!filtrados.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">No hay movimientos registrados todavía.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map(m => `
+    <tr>
+      <td>${m.fecha}</td>
+      <td><span class="badge ${badgeClase(m.tipo)}">${m.tipo}</span></td>
+      <td>${m.sucursal}</td>
+      <td>${m.persona || '—'}</td>
+      <td>${m.concepto} ${m.comprobante ? '<span title="Tiene comprobante">📎</span>' : ''}</td>
+      <td class="amount-cell">${formatoMoneda(m.monto)}</td>
+      <td>${m.capturista}</td>
+      <td>
+        <button class="icon-btn" onclick="abrirEdicion('${m.id}')" title="Editar">✎</button>
+        <button class="icon-btn" onclick="eliminarMovimiento('${m.id}')" title="Eliminar">✕</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderMisGastos() {
+  if (!sucursalSeleccionada) return;
+  const fecha = document.getElementById('misFiltroFecha').value;
+  const propios = movimientos.filter(m =>
+    m.sucursal === sucursalSeleccionada && (!fecha || m.fecha === fecha)
+  );
+
+  const total = propios.reduce((a, m) => a + m.monto, 0);
+  document.getElementById('misGastosTotal').textContent = formatoMoneda(total);
+
+  const tbody = document.getElementById('tablaMisGastos');
+  if (!propios.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">No hay movimientos capturados todavía.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = propios.map(m => `
+    <tr>
+      <td>${m.fecha}</td>
+      <td><span class="badge ${badgeClase(m.tipo)}">${m.tipo}</span></td>
+      <td>${m.persona || '—'}</td>
+      <td>${m.concepto} ${m.comprobante ? '<span title="Tiene comprobante">📎</span>' : ''}</td>
+      <td class="amount-cell">${formatoMoneda(m.monto)}</td>
+      <td>${m.capturista}</td>
+      <td>
+        <button class="icon-btn" onclick="abrirEdicion('${m.id}')" title="Editar">✎</button>
+        <button class="icon-btn" onclick="eliminarMovimiento('${m.id}')" title="Eliminar">✕</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+document.getElementById('misFiltroFecha').addEventListener('change', renderMisGastos);
+document.getElementById('misHoyBtn').addEventListener('click', () => {
+  document.getElementById('misFiltroFecha').value = hoyISO();
+  renderMisGastos();
+});
+document.getElementById('misClearBtn').addEventListener('click', () => {
+  document.getElementById('misFiltroFecha').value = '';
+  renderMisGastos();
+});
+
+document.getElementById('filterTipo').addEventListener('change', renderTabla);
+document.getElementById('filterSuc').addEventListener('change', renderTabla);
+document.getElementById('filterFecha').addEventListener('change', renderTabla);
+document.getElementById('filterCapturista').addEventListener('change', renderTabla);
+document.getElementById('clearFilters').addEventListener('click', () => {
+  document.getElementById('filterTipo').value = '';
+  document.getElementById('filterSuc').value = '';
+  document.getElementById('filterFecha').value = '';
+  document.getElementById('filterCapturista').value = '';
+  renderTabla();
+});
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  const filtrados = aplicarFiltros();
+  if (!filtrados.length) {
+    mostrarToast("No hay datos para exportar");
+    return;
+  }
+  const datos = filtrados.map(m => ({
+    Fecha: m.fecha,
+    Tipo: m.tipo,
+    Sucursal: m.sucursal,
+    Persona: m.persona,
+    Concepto: m.concepto,
+    Monto: m.monto,
+    Capturó: m.capturista,
+    Comprobante: m.comprobante ? 'Sí' : 'No'
+  }));
+  const ws = XLSX.utils.json_to_sheet(datos);
+  ws['!cols'] = [{wch:12},{wch:14},{wch:10},{wch:22},{wch:30},{wch:12},{wch:18},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Gastos");
+  XLSX.writeFile(wb, `Gastos_Ferregama_${hoyISO()}.xlsx`);
+  mostrarToast("Excel exportado");
+});
+
+let idEnEdicion = null;
+let comprobanteEdicion = null;
+
+function renderComprobanteActualEdicion(comp) {
+  const cont = document.getElementById('edComprobanteActual');
+  if (!comp) {
+    cont.innerHTML = '<span style="font-size:12.5px;color:var(--muted);">Sin comprobante adjunto</span>';
+    return;
+  }
+  if (comp.tipo === 'imagen') {
+    cont.innerHTML = `<img src="${comp.data}" style="max-height:120px;border-radius:8px;border:1px solid var(--line);">`;
+  } else {
+    cont.innerHTML = `<span style="font-size:13px;color:var(--ok);font-weight:600;">📄 ${comp.nombre || 'PDF adjuntado'}</span>`;
+  }
+}
+
+function abrirEdicion(id) {
+  const mov = movimientos.find(m => m.id === id);
+  if (!mov) return;
+  idEnEdicion = id;
+  document.getElementById('edTipo').value = mov.tipo;
+  document.getElementById('edSucursal').value = mov.sucursal;
+  document.getElementById('edPersona').value = mov.persona || '';
+  document.getElementById('edMonto').value = mov.monto;
+  document.getElementById('edConcepto').value = mov.concepto;
+  document.getElementById('edFecha').value = mov.fecha;
+  document.getElementById('edCapturista').value = mov.capturista;
+
+  comprobanteEdicion = mov.comprobante || null;
+  renderComprobanteActualEdicion(comprobanteEdicion);
+  document.getElementById('edComprobanteInput').value = '';
+
+  document.getElementById('modalEdicion').classList.add('show');
+}
+
+document.getElementById('edComprobanteZone').addEventListener('click', () => {
+  document.getElementById('edComprobanteInput').click();
+});
+
+document.getElementById('edComprobanteInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (file.type === 'application/pdf') {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      comprobanteEdicion = { tipo: 'pdf', data: ev.target.result, nombre: file.name };
+      renderComprobanteActualEdicion(comprobanteEdicion);
+    };
+    reader.readAsDataURL(file);
+  } else if (file.type.startsWith('image/')) {
+    comprimirImagen(file, (dataUrl) => {
+      comprobanteEdicion = { tipo: 'imagen', data: dataUrl, nombre: file.name };
+      renderComprobanteActualEdicion(comprobanteEdicion);
+    });
+  } else {
+    mostrarToast("Solo se permiten imágenes o PDF");
+  }
+});
+
+document.getElementById('edQuitarComprobanteBtn').addEventListener('click', () => {
+  comprobanteEdicion = null;
+  document.getElementById('edComprobanteInput').value = '';
+  renderComprobanteActualEdicion(null);
+});
+
+function cerrarEdicion() {
+  idEnEdicion = null;
+  comprobanteEdicion = null;
+  document.getElementById('modalEdicion').classList.remove('show');
+}
+
+document.getElementById('cerrarModal').addEventListener('click', cerrarEdicion);
+document.getElementById('modalEdicion').addEventListener('click', (e) => {
+  if (e.target.id === 'modalEdicion') cerrarEdicion();
+});
+
+document.getElementById('guardarEdicionBtn').addEventListener('click', async () => {
+  if (!idEnEdicion) return;
+  const mov = movimientos.find(m => m.id === idEnEdicion);
+  if (!mov) return;
+
+  const monto = parseFloat(document.getElementById('edMonto').value);
+  const concepto = document.getElementById('edConcepto').value.trim();
+  const capturista = document.getElementById('edCapturista').value.trim();
+  const fecha = document.getElementById('edFecha').value;
+
+  if (!monto || monto <= 0 || !concepto || !capturista || !fecha) {
+    mostrarToast("Revisa monto, concepto, fecha o capturista");
+    return;
+  }
+
+  const cambios = {
+    tipo: document.getElementById('edTipo').value,
+    sucursal: document.getElementById('edSucursal').value,
+    persona: document.getElementById('edPersona').value.trim(),
+    monto: monto,
+    concepto: concepto,
+    fecha: fecha,
+    capturista: capturista,
+    comprobante: comprobanteEdicion
+  };
+
+  const idGuardado = idEnEdicion;
+  try {
+    await actualizarMovimientoDB(idGuardado, cambios);
+    cerrarEdicion();
+    mostrarToast("Movimiento actualizado");
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Error al actualizar. Verifica tu conexión.");
+  }
+});
+
+suscribirMovimientos();
+</script>
+
+</body>
+</html>
