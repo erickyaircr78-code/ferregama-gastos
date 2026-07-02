@@ -510,19 +510,6 @@ window.addEventListener('online',()=>document.getElementById('offlineBanner').st
 window.addEventListener('offline',()=>document.getElementById('offlineBanner').style.display='block');
 
 /* USUARIOS */
-const USUARIOS={
-  miriam:{pass:'Miriam2026',suc:'CDMX',rol:'capturista'},
-  claudia:{pass:'Claudia2026',suc:'CDMX',rol:'capturista'},
-  lilian:{pass:'Lilian2026',suc:'CDMX',rol:'admin'},
-  pepe:{pass:'Pepe2026',suc:'CDMX',rol:'viewer'},
-  erick:{pass:'Erick2026',suc:'CDMX',rol:'admin'},
-  alexis:{pass:'Alexis2026',suc:'Morelos',rol:'capturista'},
-  jennifer:{pass:'Jennifer2026',suc:'Morelos',rol:'capturista'},
-  karen:{pass:'Karen2026',suc:'Morelos',rol:'capturista'},
-  ricardo:{pass:'Ricardo2026',suc:'Puebla',rol:'capturista'},
-  nancy:{pass:'Nancy2026',suc:'Puebla',rol:'capturista'}
-};
-
 let sesion=null;
 const $ =id=>document.getElementById(id);
 const fmt=n=>new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(n||0);
@@ -533,14 +520,22 @@ function bdg(tipo){const m={'Bonificación a cliente':'bonif','Bono/Extra a pers
 /* LOGIN */
 $('loginBtn').addEventListener('click',()=>doLogin());
 $('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-function doLogin(){
+async function doLogin(){
   const u=$('loginUser').value.trim().toLowerCase();
   const p=$('loginPass').value;
-  const usr=USUARIOS[u];
-  if(!usr||usr.pass!==p){$('loginErr').style.display='block';return;}
-  sesion={user:u,...usr};
-  sessionStorage.setItem('fg_sesion',JSON.stringify(sesion));
-  iniciarSesion();
+  $('loginBtn').disabled=true;$('loginBtn').textContent='Verificando...';
+  try{
+    const doc=await db.collection('usuarios').doc(u).get();
+    if(!doc.exists||doc.data().pass!==p||doc.data().estado==='inactivo'){
+      $('loginErr').style.display='block';$('loginBtn').disabled=false;$('loginBtn').textContent='Entrar';return;
+    }
+    const data=doc.data();
+    sesion={user:u,suc:data.sucursal,rol:data.rol};
+    sessionStorage.setItem('fg_sesion',JSON.stringify(sesion));
+    // registrar último acceso
+    db.collection('usuarios').doc(u).update({ultimoAcceso:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    iniciarSesion();
+  }catch(e){$('loginErr').style.display='block';$('loginBtn').disabled=false;$('loginBtn').textContent='Entrar';}
 }
 function iniciarSesion(){
   $('loginOv').style.display='none';

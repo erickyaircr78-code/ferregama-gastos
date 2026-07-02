@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administración de Usuarios — Ferregama</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --ink:#141c18;--paper:#f4f2eb;--card:#fff;--line:#e2ddd4;
+  --accent:#b5482a;--accent2:#8c3620;
+  --ok:#2e7d45;--ok-bg:#e6f4eb;
+  --warn:#c07a00;--warn-bg:#fff3d6;
+  --danger:#c0392b;--danger-bg:#fdecea;
+  --muted:#8a857a;--field:#f0ede4;
+  --radius:12px;--shadow:0 4px 20px rgba(0,0,0,.08);--shadow-lg:0 12px 40px rgba(0,0,0,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pop{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--paper);color:var(--ink);}
+
+.topbar{background:linear-gradient(135deg,#141c18,#1e3028);color:#fff;padding:14px 24px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50;box-shadow:0 2px 20px rgba(0,0,0,.25);}
+.topbar-l .ey{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9eb8a8;font-weight:600;}
+.topbar-l h1{font-size:17px;font-weight:800;}
+.topbar-r{display:flex;align-items:center;gap:10px;}
+.vbadge{font-size:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#9eb8a8;padding:3px 9px;border-radius:20px;font-weight:700;}
+
+.wrap{max-width:1100px;margin:0 auto;padding:22px 24px 60px;}
+
+/* LOGIN */
+.login-ov{position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#1e3028,#141c18);display:flex;align-items:center;justify-content:center;z-index:300;}
+.login-box{background:var(--card);border-radius:16px;padding:32px 28px;max-width:360px;width:90%;box-shadow:0 30px 60px rgba(0,0,0,.4);animation:pop .4s cubic-bezier(.34,1.56,.64,1);}
+.login-box .logo{text-align:center;font-size:28px;margin-bottom:8px;}
+.login-box h2{font-size:18px;font-weight:800;text-align:center;margin-bottom:4px;}
+.login-box p{font-size:12px;color:var(--muted);text-align:center;margin-bottom:20px;}
+.login-err{background:var(--danger-bg);color:var(--danger);border:1px solid #e57373;border-radius:7px;padding:8px 11px;font-size:12px;font-weight:600;margin-bottom:12px;display:none;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);animation:up .3s ease;}
+.stat .lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:4px;}
+.stat .val{font-size:22px;font-weight:900;}
+.stat.total .val{color:var(--accent2);}
+.stat.activos .val{color:var(--ok);}
+.stat.inactivos .val{color:var(--muted);}
+.stat.admins .val{color:var(--warn);}
+
+/* CARD */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:16px;}
+.card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.ct{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);}
+
+/* TABLA */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;padding:9px 10px;background:var(--field);color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--line);}
+td{padding:10px 10px;border-bottom:1px solid var(--line);transition:background .1s;}
+tr:hover td{background:#faf8f3;}
+tr.inactivo td{opacity:.5;}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:9px;}
+
+/* BADGES */
+.rol-badge{padding:3px 10px;border-radius:12px;font-size:10.5px;font-weight:800;display:inline-block;}
+.rol-admin{background:#fff3d6;color:var(--warn);}
+.rol-capturista{background:var(--ok-bg);color:var(--ok);}
+.rol-viewer{background:#f0ede4;color:var(--muted);}
+.suc-badge{padding:2px 8px;border-radius:8px;font-size:10.5px;font-weight:700;background:var(--field);color:var(--ink);}
+.estado-badge{padding:3px 9px;border-radius:12px;font-size:10.5px;font-weight:800;}
+.estado-activo{background:var(--ok-bg);color:var(--ok);}
+.estado-inactivo{background:var(--danger-bg);color:var(--danger);}
+
+/* FIELDS */
+.fg{margin-bottom:13px;}
+label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:5px;}
+input,select{width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--field);font-size:14px;color:var(--ink);font-family:inherit;transition:all .2s;}
+input:focus,select:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(181,72,42,.1);}
+.fg-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+
+/* BTNS */
+.btn-submit{width:100%;padding:12px;border:none;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 14px rgba(181,72,42,.3);transition:all .2s;margin-top:4px;}
+.btn-submit:hover{transform:translateY(-1px);}
+.btn-sec{padding:8px 14px;background:transparent;border:1.5px solid var(--line);color:var(--ink);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-sec:hover{background:var(--field);}
+.btn-danger{padding:8px 14px;background:transparent;border:1.5px solid var(--danger-br, #e57373);color:var(--danger);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-danger:hover{background:var(--danger-bg);}
+.ibtn{border:none;background:transparent;cursor:pointer;font-size:12px;color:var(--muted);padding:4px 7px;border-radius:6px;transition:all .14s;}
+.ibtn:hover{background:var(--field);color:var(--accent);}
+
+/* MODAL */
+.mov{position:fixed;inset:0;background:rgba(20,28,24,.6);display:none;align-items:center;justify-content:center;z-index:100;backdrop-filter:blur(3px);}
+.mov.show{display:flex;animation:up .15s ease;}
+.mbox{background:var(--card);border-radius:14px;padding:24px;width:90%;max-width:460px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:pop .25s cubic-bezier(.34,1.56,.64,1);}
+.mbox h2{font-size:16px;font-weight:800;margin-bottom:16px;}
+.mclose{float:right;border:none;background:transparent;font-size:17px;cursor:pointer;color:var(--muted);transition:transform .15s;}
+.mclose:hover{transform:rotate(90deg);color:var(--accent);}
+
+/* TOAST */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px) scale(.9);background:linear-gradient(135deg,#141c18,#1e3028);color:#fff;padding:11px 20px;border-radius:9px;font-size:13px;font-weight:700;opacity:0;transition:all .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,.3);display:flex;align-items:center;gap:7px;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0) scale(1);}
+.toast-ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+
+.status-msg{text-align:center;font-size:12px;font-weight:700;margin-top:8px;min-height:15px;}
+.status-msg.ok{color:var(--ok);}
+.status-msg.err{color:var(--danger);}
+
+.pass-wrap{position:relative;}
+.pass-wrap input{padding-right:40px;}
+.pass-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);border:none;background:transparent;cursor:pointer;font-size:14px;color:var(--muted);}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-ov" id="loginOv">
+  <div class="login-box">
+    <div class="logo">⚙️</div>
+    <h2>Admin de usuarios</h2>
+    <p>Solo administradores del sistema</p>
+    <div class="login-err" id="loginErr">Acceso no permitido</div>
+    <div class="fg"><label>Usuario</label><input type="text" id="loginUser" placeholder="Tu usuario" autocapitalize="none"></div>
+    <div class="fg"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
+    <button class="btn-submit" id="loginBtn">Entrar</button>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="ey">Ferregama · Sistema</div>
+    <h1>Administración de usuarios</h1>
+  </div>
+  <div class="topbar-r">
+    <span class="vbadge">v1 · Firebase</span>
+    <span class="vbadge" id="userBadge"></span>
+    <button class="btn-sec" id="logoutBtn" style="font-size:11px;padding:6px 11px;display:none;color:#9eb8a8;border-color:rgba(255,255,255,.2);">Salir</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- ESTADÍSTICAS -->
+  <div class="stats">
+    <div class="stat total"><div class="lbl">Total usuarios</div><div class="val" id="statTotal">0</div></div>
+    <div class="stat activos"><div class="lbl">Activos</div><div class="val" id="statActivos">0</div></div>
+    <div class="stat inactivos"><div class="lbl">Inactivos</div><div class="val" id="statInactivos">0</div></div>
+    <div class="stat admins"><div class="lbl">Admins</div><div class="val" id="statAdmins">0</div></div>
+  </div>
+
+  <!-- TABLA DE USUARIOS -->
+  <div class="card">
+    <div class="card-header">
+      <p class="ct">Usuarios del sistema</p>
+      <button class="btn-submit" id="nuevoBtn" style="width:auto;padding:9px 18px;margin:0;">+ Nuevo usuario</button>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr>
+          <th>Usuario</th><th>Sucursal</th><th>Rol</th>
+          <th>Estado</th><th>Último acceso</th><th>Acciones</th>
+        </tr></thead>
+        <tbody id="usuariosTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL USUARIO -->
+<div class="mov" id="modalUsuario">
+  <div class="mbox">
+    <button class="mclose" id="cerrarModal">✕</button>
+    <h2 id="modalTitulo">Nuevo usuario</h2>
+
+    <div class="fg"><label>Usuario (nombre de login)</label><input type="text" id="uUsuario" placeholder="ej. miriam" autocapitalize="none"></div>
+    <div class="fg-grid">
+      <div class="fg"><label>Sucursal</label>
+        <select id="uSucursal">
+          <option value="CDMX">CDMX</option>
+          <option value="Morelos">Morelos</option>
+          <option value="Puebla">Puebla</option>
+        </select>
+      </div>
+      <div class="fg"><label>Rol</label>
+        <select id="uRol">
+          <option value="capturista">Capturista</option>
+          <option value="admin">Admin</option>
+          <option value="viewer">Viewer (solo lectura)</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Contraseña</label>
+      <div class="pass-wrap">
+        <input type="password" id="uPass" placeholder="Mínimo 6 caracteres">
+        <button type="button" class="pass-toggle" id="togglePass">👁</button>
+      </div>
+    </div>
+    <div class="fg" id="uPassConfirmWrap">
+      <label>Confirmar contraseña</label>
+      <div class="pass-wrap">
+        <input type="password" id="uPassConfirm" placeholder="Repite la contraseña">
+        <button type="button" class="pass-toggle" id="togglePassConf">👁</button>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Estado</label>
+      <select id="uEstado">
+        <option value="activo">Activo</option>
+        <option value="inactivo">Inactivo</option>
+      </select>
+    </div>
+
+    <button class="btn-submit" id="guardarUsuarioBtn">Guardar usuario</button>
+    <div class="status-msg" id="modalStatus"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"><div class="toast-ic" id="toastIc">✓</div><span id="toastTxt"></span></div>
+
+<script>
+const FB={apiKey:"AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",authDomain:"ferregama-gastos.firebaseapp.com",projectId:"ferregama-gastos",storageBucket:"ferregama-gastos.firebasestorage.app",messagingSenderId:"561677307493",appId:"1:561677307493:web:adb5284746c1dac3e3408c"};
+firebase.initializeApp(FB);
+const db=firebase.firestore();
+
+const ADMINS_HARDCODE={erick:{pass:'Erick2026'},lilian:{pass:'Lilian2026'}};
+let sesion=null;
+let usuarios=[];
+let editandoId=null;
+
+const $=id=>document.getElementById(id);
+function toast(txt,ok=true){const t=$('toast');$('toastTxt').textContent=txt;$('toastIc').style.background=ok?'var(--ok)':'var(--danger)';t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
+
+/* LOGIN — solo admins */
+$('loginBtn').addEventListener('click',doLogin);
+$('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+function doLogin(){
+  const u=$('loginUser').value.trim().toLowerCase();
+  const p=$('loginPass').value;
+  const usr=ADMINS_HARDCODE[u];
+  if(!usr||usr.pass!==p){$('loginErr').style.display='block';return;}
+  sesion=u;
+  sessionStorage.setItem('fg_admin_ses',u);
+  $('loginOv').style.display='none';
+  $('userBadge').textContent=u;
+  $('logoutBtn').style.display='block';
+  inicializar();
+}
+$('logoutBtn').addEventListener('click',()=>{sessionStorage.removeItem('fg_admin_ses');location.reload();});
+const sg=sessionStorage.getItem('fg_admin_ses');
+if(sg&&ADMINS_HARDCODE[sg]){sesion=sg;$('loginOv').style.display='none';$('userBadge').textContent=sg;$('logoutBtn').style.display='block';inicializar();}
+
+/* INIT — carga usuarios de Firestore, si no existen los crea desde el hardcode inicial */
+async function inicializar(){
+  db.collection('usuarios').orderBy('usuario').onSnapshot(snap=>{
+    usuarios=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if(usuarios.length===0)cargarUsuariosIniciales();
+    else renderTabla();
+  });
+}
+
+async function cargarUsuariosIniciales(){
+  const base=[
+    {usuario:'miriam',pass:'Miriam2026',sucursal:'CDMX',rol:'capturista',estado:'activo'},
+    {usuario:'claudia',pass:'Claudia2026',sucursal:'CDMX',rol:'capturista',estado:'activo'},
+    {usuario:'lilian',pass:'Lilian2026',sucursal:'CDMX',rol:'admin',estado:'activo'},
+    {usuario:'pepe',pass:'Pepe2026',sucursal:'CDMX',rol:'viewer',estado:'activo'},
+    {usuario:'erick',pass:'Erick2026',sucursal:'CDMX',rol:'admin',estado:'activo'},
+    {usuario:'alexis',pass:'Alexis2026',sucursal:'Morelos',rol:'capturista',estado:'activo'},
+    {usuario:'jennifer',pass:'Jennifer2026',sucursal:'Morelos',rol:'capturista',estado:'activo'},
+    {usuario:'karen',pass:'Karen2026',sucursal:'Morelos',rol:'capturista',estado:'activo'},
+    {usuario:'ricardo',pass:'Ricardo2026',sucursal:'Puebla',rol:'capturista',estado:'activo'},
+    {usuario:'nancy',pass:'Nancy2026',sucursal:'Puebla',rol:'capturista',estado:'activo'},
+  ];
+  const batch=db.batch();
+  base.forEach(u=>{const ref=db.collection('usuarios').doc(u.usuario);batch.set(ref,{...u,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});});
+  await batch.commit();
+  toast('Usuarios iniciales cargados en Firebase');
+}
+
+/* RENDER TABLA */
+function renderTabla(){
+  const activos=usuarios.filter(u=>u.estado==='activo').length;
+  const inactivos=usuarios.filter(u=>u.estado==='inactivo').length;
+  const admins=usuarios.filter(u=>u.rol==='admin').length;
+  $('statTotal').textContent=usuarios.length;
+  $('statActivos').textContent=activos;
+  $('statInactivos').textContent=inactivos;
+  $('statAdmins').textContent=admins;
+
+  const tb=$('usuariosTbody');
+  if(!usuarios.length){tb.innerHTML='<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin usuarios. Crea el primero.</td></tr>';return;}
+  tb.innerHTML=usuarios.map(u=>`<tr class="${u.estado==='inactivo'?'inactivo':''}">
+    <td><strong>${u.usuario}</strong></td>
+    <td><span class="suc-badge">${u.sucursal}</span></td>
+    <td><span class="rol-badge rol-${u.rol}">${u.rol}</span></td>
+    <td><span class="estado-badge estado-${u.estado}">${u.estado==='activo'?'Activo':'Inactivo'}</span></td>
+    <td style="font-size:11px;color:var(--muted);">${u.ultimoAcceso?new Date(u.ultimoAcceso.toDate()).toLocaleDateString('es-MX'):'—'}</td>
+    <td>
+      <button class="ibtn" onclick="abrirEditar('${u.id}')" title="Editar">✎</button>
+      <button class="ibtn" onclick="toggleEstado('${u.id}','${u.estado}')" title="${u.estado==='activo'?'Desactivar':'Activar'}">${u.estado==='activo'?'🔴':'🟢'}</button>
+      <button class="ibtn" onclick="cambiarPass('${u.id}','${u.usuario}')" title="Cambiar contraseña">🔑</button>
+    </td>
+  </tr>`).join('');
+}
+
+/* NUEVO USUARIO */
+$('nuevoBtn').addEventListener('click',()=>{
+  editandoId=null;
+  $('modalTitulo').textContent='Nuevo usuario';
+  $('uUsuario').value='';$('uUsuario').disabled=false;
+  $('uSucursal').value='CDMX';$('uRol').value='capturista';
+  $('uPass').value='';$('uPassConfirm').value='';
+  $('uEstado').value='activo';
+  $('uPassConfirmWrap').style.display='block';
+  $('modalStatus').textContent='';
+  $('modalUsuario').classList.add('show');
+});
+
+/* EDITAR */
+function abrirEditar(id){
+  const u=usuarios.find(x=>x.id===id);if(!u)return;
+  editandoId=id;
+  $('modalTitulo').textContent=`Editar — ${u.usuario}`;
+  $('uUsuario').value=u.usuario;$('uUsuario').disabled=true;
+  $('uSucursal').value=u.sucursal;$('uRol').value=u.rol;
+  $('uPass').value='';$('uPassConfirm').value='';
+  $('uEstado').value=u.estado;
+  $('uPassConfirmWrap').style.display='block';
+  $('modalStatus').textContent='';
+  $('modalUsuario').classList.add('show');
+}
+
+/* CAMBIAR CONTRASEÑA RÁPIDO */
+function cambiarPass(id,nombre){
+  editandoId=id;
+  $('modalTitulo').textContent=`Cambiar contraseña — ${nombre}`;
+  const u=usuarios.find(x=>x.id===id);
+  $('uUsuario').value=u.usuario;$('uUsuario').disabled=true;
+  $('uSucursal').value=u.sucursal;$('uRol').value=u.rol;$('uEstado').value=u.estado;
+  $('uPass').value='';$('uPassConfirm').value='';
+  $('uPassConfirmWrap').style.display='block';
+  $('modalStatus').textContent='';
+  $('modalUsuario').classList.add('show');
+  setTimeout(()=>$('uPass').focus(),200);
+}
+
+/* TOGGLE ESTADO */
+async function toggleEstado(id,estadoActual){
+  const nuevo=estadoActual==='activo'?'inactivo':'activo';
+  const u=usuarios.find(x=>x.id===id);
+  if(!confirm(`¿${nuevo==='inactivo'?'Desactivar':'Activar'} al usuario ${u.usuario}?`))return;
+  try{
+    await db.collection('usuarios').doc(id).update({estado:nuevo});
+    toast(`Usuario ${u.usuario} ${nuevo==='activo'?'activado':'desactivado'}`);
+  }catch(e){toast('Error al cambiar estado',false);}
+}
+
+/* GUARDAR */
+$('cerrarModal').addEventListener('click',()=>{editandoId=null;$('modalUsuario').classList.remove('show');});
+$('modalUsuario').addEventListener('click',e=>{if(e.target.id==='modalUsuario'){editandoId=null;$('modalUsuario').classList.remove('show');}});
+
+$('guardarUsuarioBtn').addEventListener('click',async()=>{
+  const usuario=$('uUsuario').value.trim().toLowerCase();
+  const sucursal=$('uSucursal').value;
+  const rol=$('uRol').value;
+  const pass=$('uPass').value;
+  const passConf=$('uPassConfirm').value;
+  const estado=$('uEstado').value;
+  const st=$('modalStatus');
+
+  if(!usuario){st.textContent='El nombre de usuario es obligatorio.';st.className='status-msg err';return;}
+  if(pass&&pass.length<6){st.textContent='La contraseña debe tener al menos 6 caracteres.';st.className='status-msg err';return;}
+  if(pass&&pass!==passConf){st.textContent='Las contraseñas no coinciden.';st.className='status-msg err';return;}
+  if(!editandoId&&!pass){st.textContent='La contraseña es obligatoria para nuevos usuarios.';st.className='status-msg err';return;}
+
+  try{
+    if(editandoId){
+      const datos={sucursal,rol,estado};
+      if(pass)datos.pass=pass;
+      await db.collection('usuarios').doc(editandoId).update(datos);
+      toast('Usuario actualizado');
+    } else {
+      const existe=usuarios.find(u=>u.usuario===usuario);
+      if(existe){st.textContent='Ya existe un usuario con ese nombre.';st.className='status-msg err';return;}
+      await db.collection('usuarios').doc(usuario).set({usuario,pass,sucursal,rol,estado,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+      toast('Usuario creado');
+    }
+    $('modalUsuario').classList.remove('show');editandoId=null;
+  }catch(e){st.textContent='Error al guardar: '+e.message;st.className='status-msg err';}
+});
+
+/* VER/OCULTAR CONTRASEÑA */
+$('togglePass').addEventListener('click',()=>{const i=$('uPass');i.type=i.type==='password'?'text':'password';});
+$('togglePassConf').addEventListener('click',()=>{const i=$('uPassConfirm');i.type=i.type==='password'?'text':'password';});
+</script>
+</body>
+</html>

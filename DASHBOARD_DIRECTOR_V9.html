@@ -347,12 +347,6 @@ tr:hover td{background:#faf8f3;}
 <script>
 if(window.location.protocol==='file:')document.getElementById('fileAlert').style.display='block';
 
-const USUARIOS={
-  lilian:{pass:'Lilian2026',rol:'admin'},
-  pepe:{pass:'Pepe2026',rol:'viewer'},
-  erick:{pass:'Erick2026',rol:'admin'}
-};
-
 const FB={apiKey:"AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",authDomain:"ferregama-gastos.firebaseapp.com",projectId:"ferregama-gastos",storageBucket:"ferregama-gastos.firebasestorage.app",messagingSenderId:"561677307493",appId:"1:561677307493:web:adb5284746c1dac3e3408c"};
 firebase.initializeApp(FB);
 const db=firebase.firestore();
@@ -373,14 +367,25 @@ function bdg(t){const m={'Bonificación a cliente':'bonif','Bono/Extra a persona
 /* LOGIN — solo admins y viewer */
 $('loginBtn').addEventListener('click',doLogin);
 $('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-function doLogin(){
+async function doLogin(){
   const u=$('loginUser').value.trim().toLowerCase();
   const p=$('loginPass').value;
-  const usr=USUARIOS[u];
-  if(!usr||usr.pass!==p){$('loginErr').style.display='block';return;}
-  sesion={user:u,...usr};
-  sessionStorage.setItem('fg_dash_ses',JSON.stringify(sesion));
-  iniciar();
+  $('loginBtn').disabled=true;$('loginBtn').textContent='Verificando...';
+  try{
+    const doc=await db.collection('usuarios').doc(u).get();
+    if(!doc.exists||doc.data().pass!==p||doc.data().estado==='inactivo'){
+      $('loginErr').style.display='block';$('loginBtn').disabled=false;$('loginBtn').textContent='Entrar al dashboard';return;
+    }
+    const data=doc.data();
+    if(data.rol!=='admin'&&data.rol!=='viewer'){
+      $('loginErr').style.display='block';$('loginErr').textContent='Este acceso es solo para dirección y administradores.';
+      $('loginBtn').disabled=false;$('loginBtn').textContent='Entrar al dashboard';return;
+    }
+    sesion={user:u,rol:data.rol};
+    sessionStorage.setItem('fg_dash_ses',JSON.stringify(sesion));
+    db.collection('usuarios').doc(u).update({ultimoAcceso:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    iniciar();
+  }catch(e){$('loginErr').style.display='block';$('loginBtn').disabled=false;$('loginBtn').textContent='Entrar al dashboard';}
 }
 function iniciar(){
   $('loginOv').style.display='none';
