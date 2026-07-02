@@ -158,6 +158,11 @@ tr:hover td{background:#faf8f3;}
 /* ESTADO FIJOS */
 .ep{padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;}
 .ep.pagado{background:var(--ok-bg);color:var(--ok);}
+
+.export-opt{display:block;width:100%;padding:10px 14px;text-align:left;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:background .15s;font-family:inherit;}
+.export-opt:hover{background:var(--field);}
+.export-opt:not(:last-child){border-bottom:1px solid var(--line);}
+
 .ep.pendiente{background:var(--warn-bg);color:var(--warn);}
 
 /* BONIF BLOQUE */
@@ -218,7 +223,20 @@ tr:hover td{background:#faf8f3;}
     <button class="btn-sec" id="hoyBtn">Solo hoy</button>
     <button class="btn-sec" id="semBtn">Esta semana</button>
     <button class="btn-sec" id="clearBtn">Quitar filtros</button>
-    <button class="btn-sec" id="exportBtn">Exportar Excel</button>
+    <div style="position:relative;" id="exportWrap">
+      <button class="btn-sec" id="exportMenuBtn" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;">
+        ⬇ Descargar reporte
+      </button>
+      <div id="exportMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);min-width:260px;z-index:50;overflow:hidden;">
+        <div style="padding:8px 12px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--line);">Selecciona el reporte</div>
+        <button class="export-opt" data-rpt="concentrado">📊 Concentrado ejecutivo</button>
+        <button class="export-opt" data-rpt="sucursales">🏪 Por sucursal (3 hojas)</button>
+        <button class="export-opt" data-rpt="categorias">📂 Mensual por categoría</button>
+        <button class="export-opt" data-rpt="bonificaciones">📋 Bonificaciones y conciliación</button>
+        <button class="export-opt" data-rpt="sincomprobar">⚠ Gastos sin comprobar</button>
+        <button class="export-opt" data-rpt="fijosvsvar">📈 Fijos vs. variables</button>
+      </div>
+    </div>
   </div>
 
   <!-- AGENTE INTELIGENTE -->
@@ -636,18 +654,181 @@ $('analizarBtn').addEventListener('click',()=>llamarAgente());
 $('preguntarBtn').addEventListener('click',()=>{const p=$('pregunta').value.trim();if(p)llamarAgente(p);});
 $('pregunta').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const p=$('pregunta').value.trim();if(p)llamarAgente(p);}});
 
-/* EXPORT */
-$('exportBtn').addEventListener('click',()=>{
-  const f=filtrar();if(!f.length)return;
-  const wb=XLSX.utils.book_new();
+/* ─── MENÚ DE REPORTES ─── */
+$('exportMenuBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  const m=$('exportMenu');
+  m.style.display=m.style.display==='none'?'block':'none';
+});
+document.addEventListener('click',()=>$('exportMenu').style.display='none');
+document.querySelectorAll('.export-opt').forEach(b=>b.addEventListener('click',()=>{
+  $('exportMenu').style.display='none';
+  generarReporte(b.dataset.rpt);
+}));
+
+function estiloCol(ws,cols){ws['!cols']=cols.map(w=>({wch:w}));}
+function filaTotal(datos,cols){
+  const fila={};
+  cols.forEach(c=>{const s=datos.reduce((a,r)=>a+(parseFloat(r[c])||0),0);fila[c]=s?s:'';});
+  return fila;
+}
+
+function generarReporte(tipo){
+  const f=filtrar();
   const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
-  const d1=gastos.map(m=>({Fecha:m.fecha,Tipo:m.tipo,Sucursal:m.sucursal,Persona:m.persona||'',Concepto:m.concepto,Monto:m.monto,Capturó:m.capturista,'Autorizado por':m.autorizado||'','Causa raíz':m.causaRaiz||'',Comprobante:m.comprobante?'Sí':'No'}));
-  const ws1=XLSX.utils.json_to_sheet(d1);XLSX.utils.book_append_sheet(wb,ws1,'Gastos operativos');
-  if(bonifs.length){const d2=bonifs.map(m=>({Fecha:m.fecha,Sucursal:m.sucursal,Cliente:m.bonifCliente||'',Cuenta:m.bonifCuenta||'',"Desc%":m.bonifPct||'',Monto:m.monto,"¿Cuadra?":m.bonifCuadra||'',Folios:m.bonifFolios||'',Capturó:m.capturista}));const ws2=XLSX.utils.json_to_sheet(d2);XLSX.utils.book_append_sheet(wb,ws2,'Bonificaciones');}
-  if(catalogoFijos.length){const d3=catalogoFijos.map(c=>({Concepto:c.concepto,Sucursal:c.sucursal,"Día":c.dia||'',Monto:c.monto,Estado:estadosFijos[`${claveMes}_${c.id}`]||'pendiente'}));const ws3=XLSX.utils.json_to_sheet(d3);XLSX.utils.book_append_sheet(wb,ws3,'Gastos fijos');}
-  XLSX.writeFile(wb,`Concentrado_Ferregama_${hoyISO()}.xlsx`);
-});
+  const wb=XLSX.utils.book_new();
+  const hoy2=hoyISO();
+  const periodoTxt=`${$('fDesde').value||'inicio'} al ${$('fHasta').value||hoy2}`;
+
+  if(tipo==='concentrado'){
+    // HOJA 1: Resumen ejecutivo
+    const resumen=[
+      {'Indicador':'Periodo analizado','Valor':periodoTxt},
+      {'Indicador':'Sucursal','Valor':$('fSuc').value||'Todas'},
+      {'Indicador':'Total gasto operativo','Valor':gastos.reduce((a,m)=>a+m.monto,0)},
+      {'Indicador':'Total bonificaciones (no gasto)','Valor':bonifs.reduce((a,m)=>a+m.monto,0)},
+      {'Indicador':'Movimientos registrados','Valor':gastos.length},
+      {'Indicador':'Sin comprobante ni causa raíz','Valor':gastos.filter(m=>!m.comprobante&&!m.causaRaiz).length},
+      {'Indicador':'Con autorización especial','Valor':gastos.filter(m=>m.autorizado).length},
+      {'Indicador':'Gastos fijos del mes','Valor':catalogoFijos.reduce((a,c)=>a+c.monto,0)},
+      {'Indicador':'Gastos fijos pendientes','Valor':catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente').reduce((a,c)=>a+c.monto,0)},
+    ];
+    const ws1=XLSX.utils.json_to_sheet(resumen);
+    estiloCol(ws1,[35,20]);
+    XLSX.utils.book_append_sheet(wb,ws1,'Resumen ejecutivo');
+    // HOJA 2: Detalle gastos
+    const det=gastos.map(m=>({'Fecha':m.fecha,'Tipo':m.tipo,'Sucursal':m.sucursal,'Persona':m.persona||'','Concepto':m.concepto,'Monto':m.monto,'Capturó':m.capturista,'Autorizado por':m.autorizado||'','Causa raíz':m.causaRaiz||'','Comprobante':m.comprobante?'Sí':'No'}));
+    const ws2=XLSX.utils.json_to_sheet(det);
+    estiloCol(ws2,[12,22,10,20,28,12,14,18,22,10]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle gastos');
+    // HOJA 3: Bonificaciones
+    if(bonifs.length){
+      const db2=bonifs.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Cliente':m.bonifCliente||'','Cuenta':m.bonifCuenta||'','Desc%':m.bonifPct||'','Monto bonificado':m.monto,'¿Cuadra?':m.bonifCuadra||'','Folios':m.bonifFolios||'','Capturó':m.capturista}));
+      const ws3=XLSX.utils.json_to_sheet(db2);
+      estiloCol(ws3,[12,10,24,12,8,16,10,18,14]);
+      XLSX.utils.book_append_sheet(wb,ws3,'Bonificaciones');
+    }
+    XLSX.writeFile(wb,`Concentrado_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='sucursales'){
+    ['CDMX','Morelos','Puebla'].forEach(suc=>{
+      const ms=gastos.filter(m=>m.sucursal===suc);
+      if(!ms.length){
+        const ws=XLSX.utils.json_to_sheet([{'Sucursal':suc,'Nota':'Sin movimientos en el periodo'}]);
+        XLSX.utils.book_append_sheet(wb,ws,suc);return;
+      }
+      // resumen por categoría
+      const porCat={};ms.forEach(m=>{porCat[m.tipo]=(porCat[m.tipo]||0)+m.monto;});
+      const res=Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([t,v])=>({'Categoría':t,'Total':v,'% del gasto':((v/ms.reduce((a,m)=>a+m.monto,0))*100).toFixed(1)+'%'}));
+      res.push({'Categoría':'TOTAL','Total':ms.reduce((a,m)=>a+m.monto,0),'% del gasto':'100%'});
+      const ws=XLSX.utils.json_to_sheet(res);
+      estiloCol(ws,[28,14,12]);
+      // detalle debajo
+      XLSX.utils.sheet_add_aoa(ws,[[]],{origin:-1});
+      XLSX.utils.sheet_add_aoa(ws,[['Fecha','Tipo','Persona','Concepto','Monto','Autorizado','Comp.','Capturó']],{origin:-1});
+      ms.forEach(m=>XLSX.utils.sheet_add_aoa(ws,[[m.fecha,m.tipo,m.persona||'',m.concepto,m.monto,m.autorizado||'',m.comprobante?'Sí':'No',m.capturista]],{origin:-1}));
+      XLSX.utils.book_append_sheet(wb,ws,suc);
+    });
+    XLSX.writeFile(wb,`Por_Sucursal_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='categorias'){
+    const TIPOS=['Bono/Extra a personal','Nómina/Sueldos','Vehículos: mantenimiento','Vehículos: casetas/estac/talacha','Viáticos/Foráneas','Custodia/Seguridad','Oficina/Papelería/Bodega','Servicios (luz/agua/internet)','Local: limpieza/mantto','Préstamo/Faltante a personal','Dirección/Socios','Salud/Farmacia','Otros/Revisar'];
+    // resumen por categoría y sucursal
+    const filas=TIPOS.map(t=>{
+      const tot=gastos.filter(m=>m.tipo===t).reduce((a,m)=>a+m.monto,0);
+      const cdmx=gastos.filter(m=>m.tipo===t&&m.sucursal==='CDMX').reduce((a,m)=>a+m.monto,0);
+      const mor=gastos.filter(m=>m.tipo===t&&m.sucursal==='Morelos').reduce((a,m)=>a+m.monto,0);
+      const pue=gastos.filter(m=>m.tipo===t&&m.sucursal==='Puebla').reduce((a,m)=>a+m.monto,0);
+      const totalAll=gastos.reduce((a,m)=>a+m.monto,0);
+      return{'Categoría':t,'CDMX':cdmx,'Morelos':mor,'Puebla':pue,'Total':tot,'% del periodo':totalAll?((tot/totalAll)*100).toFixed(1)+'%':'0%'};
+    });
+    const totalRow={'Categoría':'TOTAL','CDMX':gastos.filter(m=>m.sucursal==='CDMX').reduce((a,m)=>a+m.monto,0),'Morelos':gastos.filter(m=>m.sucursal==='Morelos').reduce((a,m)=>a+m.monto,0),'Puebla':gastos.filter(m=>m.sucursal==='Puebla').reduce((a,m)=>a+m.monto,0),'Total':gastos.reduce((a,m)=>a+m.monto,0),'% del periodo':'100%'};
+    filas.push(totalRow);
+    const ws=XLSX.utils.json_to_sheet(filas);
+    estiloCol(ws,[28,14,14,14,14,14]);
+    XLSX.utils.book_append_sheet(wb,ws,'Por categoría');
+    // segunda hoja: detalle por día
+    const porDia={};gastos.forEach(m=>{porDia[m.fecha]=(porDia[m.fecha]||0)+m.monto;});
+    const dias=Object.entries(porDia).sort().map(([f,v])=>({'Fecha':f,'Total del día':v,'Movimientos':gastos.filter(m=>m.fecha===f).length}));
+    const ws2=XLSX.utils.json_to_sheet(dias);
+    estiloCol(ws2,[14,16,14]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Gasto por día');
+    XLSX.writeFile(wb,`Categorias_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='bonificaciones'){
+    if(!bonifs.length){alert('No hay bonificaciones en el periodo seleccionado.');return;}
+    // resumen por cliente
+    const porCliente={};
+    bonifs.forEach(m=>{
+      const k=m.bonifCliente||'Sin cliente';
+      if(!porCliente[k])porCliente[k]={cliente:k,cuenta:m.bonifCuenta||'',movimientos:0,total:0,nosCuadra:0,noCuadra:0};
+      porCliente[k].movimientos++;
+      porCliente[k].total+=m.monto;
+      if(m.bonifCuadra==='Sí')porCliente[k].nosCuadra++;
+      else porCliente[k].noCuadra++;
+    });
+    const res=Object.values(porCliente).sort((a,b)=>b.total-a.total).map(c=>({'Cliente':c.cliente,'Cuenta':c.cuenta,'Movimientos':c.movimientos,'Total bonificado':c.total,'Cuadran':c.nosCuadra,'No cuadran':c.noCuadra,'Estado':c.noCuadra>0?'⚠ Revisar':'✓ OK'}));
+    const ws1=XLSX.utils.json_to_sheet(res);
+    estiloCol(ws1,[24,12,12,16,10,10,12]);
+    XLSX.utils.book_append_sheet(wb,ws1,'Resumen por cliente');
+    // detalle completo
+    const det=bonifs.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Cliente':m.bonifCliente||'','Cuenta':m.bonifCuenta||'','Descuento pactado %':m.bonifPct||'','Monto bonificado':m.monto,'¿Cuadra?':m.bonifCuadra||'Pendiente','Folios de factura':m.bonifFolios||'','Capturó':m.capturista}));
+    const ws2=XLSX.utils.json_to_sheet(det);
+    estiloCol(ws2,[12,10,24,12,18,16,10,22,14]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle bonificaciones');
+    XLSX.writeFile(wb,`Bonificaciones_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='sincomprobar'){
+    const sc=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
+    const cc=gastos.filter(m=>!m.comprobante&&m.causaRaiz);
+    if(!sc.length&&!cc.length){alert('No hay gastos sin comprobar en el periodo. ✓');return;}
+    if(sc.length){
+      const d1=sc.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Tipo':m.tipo,'Persona':m.persona||'','Concepto':m.concepto,'Monto':m.monto,'Capturó':m.capturista,'Autorizado por':m.autorizado||'','Acción requerida':'Solicitar comprobante o causa raíz'}));
+      const ws1=XLSX.utils.json_to_sheet(d1);
+      estiloCol(ws1,[12,10,22,20,28,12,14,18,28]);
+      XLSX.utils.book_append_sheet(wb,ws1,'Sin comprobante ni causa');
+    }
+    if(cc.length){
+      const d2=cc.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Tipo':m.tipo,'Persona':m.persona||'','Concepto':m.concepto,'Monto':m.monto,'Causa raíz registrada':m.causaRaiz,'Capturó':m.capturista}));
+      const ws2=XLSX.utils.json_to_sheet(d2);
+      estiloCol(ws2,[12,10,22,20,28,12,26,14]);
+      XLSX.utils.book_append_sheet(wb,ws2,'Con causa raíz sin comprobante');
+    }
+    XLSX.writeFile(wb,`SinComprobar_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='fijosvsvar'){
+    const totalVar=gastos.reduce((a,m)=>a+m.monto,0);
+    const totalFijos=catalogoFijos.reduce((a,c)=>a+c.monto,0);
+    const fijosPag=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pagado').reduce((a,c)=>a+c.monto,0);
+    const fijosPend=totalFijos-fijosPag;
+    const totalGeneral=totalVar+totalFijos;
+    // resumen
+    const res=[
+      {'Concepto':'Gasto variable (efectivo)','Monto':totalVar,'% del total':totalGeneral?((totalVar/totalGeneral)*100).toFixed(1)+'%':'—'},
+      {'Concepto':'Gastos fijos del mes','Monto':totalFijos,'% del total':totalGeneral?((totalFijos/totalGeneral)*100).toFixed(1)+'%':'—'},
+      {'Concepto':'   — Pagados','Monto':fijosPag,'% del total':''},
+      {'Concepto':'   — Pendientes','Monto':fijosPend,'% del total':''},
+      {'Concepto':'TOTAL EGRESOS DEL MES','Monto':totalGeneral,'% del total':'100%'},
+    ];
+    const ws1=XLSX.utils.json_to_sheet(res);
+    estiloCol(ws1,[30,16,14]);
+    XLSX.utils.book_append_sheet(wb,ws1,'Fijos vs Variables');
+    // detalle fijos con estado
+    const detF=catalogoFijos.map(c=>({'Concepto':c.concepto,'Sucursal':c.sucursal,'Día de pago':c.dia||'—','Monto':c.monto,'Estado':estadosFijos[`${claveMes}_${c.id}`]||'pendiente','Mes':MESES[mesAct]+' '+anioAct}));
+    const ws2=XLSX.utils.json_to_sheet(detF);
+    estiloCol(ws2,[28,12,12,14,12,16]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle gastos fijos');
+    // gasto variable por categoría
+    const porCat={};gastos.forEach(m=>{porCat[m.tipo]=(porCat[m.tipo]||0)+m.monto;});
+    const detV=Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([t,v])=>({'Categoría':t,'Monto':v,'% del variable':totalVar?((v/totalVar)*100).toFixed(1)+'%':'0%'}));
+    const ws3=XLSX.utils.json_to_sheet(detV);
+    estiloCol(ws3,[28,14,16]);
+    XLSX.utils.book_append_sheet(wb,ws3,'Gasto variable por categoría');
+    XLSX.writeFile(wb,`FijosVsVariables_Ferregama_${hoy2}.xlsx`);
+  }
+}
+
 </script>
 </body>
 </html>
