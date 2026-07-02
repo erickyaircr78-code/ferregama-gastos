@@ -328,7 +328,12 @@ tr:hover td{background:#faf8f3;}
           <div class="fg"><label>A quién se le dio / nombre</label><input type="text" id="persona" placeholder="Nombre de la persona" list="personasList" autocomplete="off"><datalist id="personasList"></datalist></div>
           <div class="fg"><label>Monto</label><div class="aw"><span class="sym">$</span><input type="number" id="monto" inputmode="decimal" step="0.01" placeholder="0.00"></div></div>
           <div class="auth-alert" id="authAlert"></div>
-          <div class="fg" id="autorizWrap" style="display:none;"><label>Autorizado por (requerido)</label><input type="text" id="autorizado" placeholder="Nombre de quien autoriza"></div>
+          <div class="fg" id="autorizWrap" style="display:none;">
+            <label>Autorizado por (requerido)</label>
+            <select id="autorizado">
+              <option value="">Selecciona quién autoriza</option>
+            </select>
+          </div>
           <div class="fg">
             <label>Concepto</label>
             <input type="text" id="concepto" placeholder="Ej. Balatas, papelería, viatico..." list="conceptosList" autocomplete="off">
@@ -623,17 +628,18 @@ function limpiarDots(){document.querySelectorAll('.tip-dot').forEach(d=>d.style.
 
 /* AUTORIZACIÓN */
 const AUTH=[
-  {min:20000,max:Infinity,lvl:'block',msg:'🚫 Gasto mayor a $20,000 — requiere autorización de José Ramón García (Pepe) antes de ejecutar.',req:true},
-  {min:10000,max:19999,lvl:'danger',msg:'⚠ Gasto entre $10,000 y $20,000 — autoriza: Lilian García.',req:true},
-  {min:5001,max:9999,lvl:'warn',msg:'⚡ Reparación mayor a $5,000 — solicita cotización y aprobación de Pepe o Claudia antes de pagar.',req:false},
+  {min:20000,max:Infinity,lvl:'block',msg:'🚫 Gasto mayor a $20,000 — requiere autorización de José Ramón García (Pepe) antes de ejecutar.',req:true,opciones:['José Ramón García (Pepe)']},
+  {min:10000,max:19999,lvl:'danger',msg:'⚠ Gasto entre $10,000 y $20,000 — autoriza: Lilian García.',req:true,opciones:['Lilian García']},
+  {min:5001,max:9999,lvl:'warn',msg:'⚡ Reparación mayor a $5,000 — solicita cotización y aprobación de Pepe o Claudia antes de pagar.',req:false,opciones:['José Ramón García (Pepe)','Claudia']},
 ];
 $('monto').addEventListener('input',revisarAuth);
 function revisarAuth(){
   const m=parseFloat($('monto').value)||0;
-  const al=$('authAlert'),wr=$('autorizWrap');
+  const al=$('authAlert'),wr=$('autorizWrap'),sel=$('autorizado');
   const r=AUTH.find(x=>m>=x.min&&m<=x.max);
-  if(!r){al.style.display='none';al.className='auth-alert';wr.style.display='none';return;}
+  if(!r){al.style.display='none';al.className='auth-alert';wr.style.display='none';sel.innerHTML='<option value="">Selecciona quién autoriza</option>';return;}
   al.style.display='block';al.className='auth-alert '+r.lvl;al.textContent=r.msg;
+  sel.innerHTML='<option value="">Selecciona quién autoriza</option>'+r.opciones.map(o=>`<option value="${o}">${o}</option>`).join('');
   wr.style.display=r.req?'block':'none';
 }
 
@@ -683,8 +689,8 @@ $('submitBtn').addEventListener('click',async()=>{
   const msg=$('statusMsg'),btn=$('submitBtn');
   if(!monto||monto<=0||!concepto){msg.textContent='Falta monto o concepto.';msg.className='status-msg err';return;}
   const r=AUTH.find(x=>monto>=x.min&&monto<=x.max);
-  if(r&&r.lvl==='block'&&!autorizado){msg.textContent='Gasto bloqueado — escribe quién lo autorizó.';msg.className='status-msg err';return;}
-  if(r&&r.req&&!autorizado){msg.textContent='Este monto requiere nombre de quien aprueba.';msg.className='status-msg err';return;}
+  if(r&&r.lvl==='block'&&!autorizado){msg.textContent='Gasto bloqueado — selecciona quién lo autorizó.';msg.className='status-msg err';return;}
+  if(r&&r.req&&!autorizado){msg.textContent='Este monto requiere seleccionar quién aprueba.';msg.className='status-msg err';return;}
   if(tipoSel==='Bonificación a cliente'&&!$('bonifCliente').value.trim()){msg.textContent='Escribe el nombre del cliente para la bonificación.';msg.className='status-msg err';return;}
   const mov={fecha:hoyISO(),tipo:tipoSel,sucursal:sesion.suc,persona:persona||'',concepto,monto,capturista:cap,autorizado:autorizado||'',causaRaiz:causaRaiz||'',comprobante:comp||null,esBonificacion:tipoSel==='Bonificación a cliente'};
   if(tipoSel==='Bonificación a cliente'){mov.bonifCliente=$('bonifCliente').value.trim();mov.bonifCuenta=$('bonifCuenta').value.trim();mov.bonifPct=parseFloat($('bonifPct').value)||0;mov.bonifCuadra=$('bonifCuadra').value;mov.bonifFolios=$('bonifFolios').value.trim();}
