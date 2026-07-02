@@ -482,7 +482,7 @@ tr:hover td{background:#faf8f3;}
   <div class="mbox">
     <button class="mclose" id="cerrarReinicio">✕</button>
     <h2 style="color:var(--danger);">⚠ Reiniciar todos los datos</h2>
-    <p style="font-size:12.5px;color:var(--muted);margin:10px 0 16px;line-height:1.6;">Borra permanentemente todos los movimientos, catálogo de fijos y estados de pago. Esta acción no se puede deshacer.</p>
+    <p style="font-size:12.5px;color:var(--muted);margin:10px 0 16px;line-height:1.6;">Borra permanentemente todos los <strong>movimientos diarios</strong>, el <strong>catálogo de fijos</strong> y los <strong>estados de pago</strong>. Los usuarios y contraseñas <strong>no se tocan</strong>. Esta acción no se puede deshacer.</p>
     <div id="rPaso1"><p style="font-size:12px;font-weight:700;margin-bottom:10px;">¿Estás seguro?</p>
       <div style="display:flex;gap:8px;"><button class="btn-sec" id="rNo">Cancelar</button><button class="btn-submit" id="rSi" style="background:var(--danger);box-shadow:none;">Sí, continuar</button></div>
     </div>
@@ -788,7 +788,7 @@ $('rEjecutar').addEventListener('click',async()=>{
     st.textContent='Borrando movimientos...';const ms=await db.collection('movimientos').get();const b1=db.batch();ms.docs.forEach(d=>b1.delete(d.ref));await b1.commit();
     st.textContent='Borrando catálogo de fijos...';const fs=await db.collection('fijos_catalogo').get();const b2=db.batch();fs.docs.forEach(d=>b2.delete(d.ref));await b2.commit();
     st.textContent='Borrando estados de pago...';await db.collection('fijos_estados').doc('global').delete();
-    st.textContent='✓ Sistema en cero.';st.style.color='var(--ok)';toast('Sistema reiniciado');setTimeout(()=>$('modalReinicio').classList.remove('show'),2000);
+    st.textContent='✓ Sistema en cero. Los usuarios se conservaron.';st.style.color='var(--ok)';toast('Sistema reiniciado');setTimeout(()=>$('modalReinicio').classList.remove('show'),2000);
   }catch(e){st.textContent='Error: '+e.message;st.style.color='var(--danger)';btn.disabled=false;btn.textContent='Borrar todo';}
 });
 </script>

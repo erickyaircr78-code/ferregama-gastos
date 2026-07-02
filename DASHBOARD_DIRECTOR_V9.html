@@ -393,6 +393,7 @@ function iniciar(){
   $('logoutBtn').style.display='block';
   suscribir();
   verificarCorte();
+  setTimeout(()=>analizarAuto(),1500);
 }
 $('logoutBtn').addEventListener('click',()=>{sessionStorage.removeItem('fg_dash_ses');location.reload();});
 const sg=sessionStorage.getItem('fg_dash_ses');
@@ -552,10 +553,6 @@ function actualizarChips(f){
   $('agenteChips').innerHTML=chips.join('');
 }
 
-/* ─── AGENTE INTELIGENTE (Claude API) ─── */
-let historial=[];
-let datosParaAgente={};
-
 /* ─── AGENTE INTELIGENTE LOCAL ─── */
 let historial=[];
 
@@ -658,8 +655,11 @@ function responderPregunta(pregunta){
   return analizarDatos();
 }
 
+let yaAnalizo=false;
 function analizarAuto(){
   if(!sesion)return;
+  if(yaAnalizo)return;
+  yaAnalizo=true;
   const body=$('agenteBody');
   const sub=$('agenteSub');
   body.className='agente-body';
