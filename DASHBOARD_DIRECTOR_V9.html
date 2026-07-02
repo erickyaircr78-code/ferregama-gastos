@@ -556,108 +556,135 @@ function actualizarChips(f){
 let historial=[];
 let datosParaAgente={};
 
-function prepararContexto(){
+/* ─── AGENTE INTELIGENTE LOCAL ─── */
+let historial=[];
+
+function analizarDatos(){
   const f=filtrar();
   const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
+  const hoyStr=hoyISO();
   const total=gastos.reduce((a,m)=>a+m.monto,0);
   const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
   const sinComp=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
   const conAutor=gastos.filter(m=>m.autorizado);
-  const fijosTotal=catalogoFijos.reduce((a,c)=>a+c.monto,0);
-  const fijosPend=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente').reduce((a,c)=>a+c.monto,0);
-
-  const porSuc={};['CDMX','Morelos','Puebla'].forEach(s=>{const ms=gastos.filter(m=>m.sucursal===s);porSuc[s]={total:ms.reduce((a,m)=>a+m.monto,0),movimientos:ms.length,hoy:ms.filter(m=>m.fecha===hoyISO()).length};});
+  const fijosPend=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente');
+  const porSuc={};['CDMX','Morelos','Puebla'].forEach(s=>{
+    const ms=gastos.filter(m=>m.sucursal===s);
+    porSuc[s]={total:ms.reduce((a,m)=>a+m.monto,0),count:ms.length,hoy:ms.filter(m=>m.fecha===hoyStr).length};
+  });
   const porTipo={};gastos.forEach(m=>{porTipo[m.tipo]=(porTipo[m.tipo]||0)+m.monto;});
-  const porCapturista={};gastos.forEach(m=>{porCapturista[m.capturista]=(porCapturista[m.capturista]||0)+m.monto;});
-  const fechaFiltro=`desde ${$('fDesde').value||'inicio'} hasta ${$('fHasta').value||'hoy'}`;
-
-  datosParaAgente={total,totalBonif,sinComp:sinComp.length,conAutor:conAutor.length,fijosTotal,fijosPend,porSuc,porTipo,porCapturista,fechaFiltro,totalMovimientos:gastos.length,totalBonifMovimientos:bonifs.length,sucursal:$('fSuc').value||'todas',mesActual:MESES[mesAct]+' '+anioAct};
-
-  return `Eres el agente de análisis financiero de Ferregama, una distribuidora de materiales de construcción con 3 sucursales en México (CDMX, Morelos, Puebla). Tu rol es analizar los gastos diarios en efectivo, detectar anomalías, sugerir mejoras y responder preguntas del director y administradores.
-
-DATOS ACTUALES DEL SISTEMA (${fechaFiltro}):
-- Gasto operativo total: ${fmt(total)} (${gastos.length} movimientos)
-- Bonificaciones a clientes: ${fmt(totalBonif)} (${bonifs.length} registros) — NO son gasto
-- Sin comprobante ni causa raíz: ${sinComp.length} movimientos
-- Con autorización especial: ${conAutor.length} movimientos
-- Gastos fijos del mes (${MESES[mesAct]}): ${fmt(fijosTotal)} total, ${fmt(fijosPend)} pendientes de pagar
-
-POR SUCURSAL:
-${Object.entries(porSuc).map(([s,v])=>`- ${s}: ${fmt(v.total)} (${v.movimientos} mov, ${v.hoy} hoy)`).join('\n')}
-
-POR CATEGORÍA:
-${Object.entries(porTipo).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([t,v])=>`- ${t}: ${fmt(v)}`).join('\n')}
-
-POR CAPTURISTA:
-${Object.entries(porCapturista).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([c,v])=>`- ${c}: ${fmt(v)}`).join('\n')}
-
-REGLAS DEL NEGOCIO:
-- Gasolina viene de Efectivale (no se captura aquí)
-- Bonificaciones son el ~52% del flujo pero NO son gasto operativo
-- Reparación vehículo >$5,000 requiere cotización y aprobación de Pepe o Claudia
-- $10,000-$20,000 autoriza Lilian García
-- >$20,000 autoriza José Ramón García (Pepe)
-- Sin comprobante requiere causa raíz
-
-Responde en español mexicano directo. Máximo 4 oraciones para análisis automático. Para preguntas específicas, responde concreto y accionable. Usa moneda mexicana (MXN). Señala anomalías, patrones y oportunidades de mejora.`;
+  const topTipo=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+  const sinCapturarHoy=['CDMX','Morelos','Puebla'].filter(s=>porSuc[s].hoy===0);
+  const bonifNoCuadran=bonifs.filter(m=>m.bonifCuadra==='No');
+  const gastosMayores=gastos.filter(m=>m.monto>=10000);
+  const parrafos=[];
+  if(gastos.length===0){
+    parrafos.push('Sin movimientos capturados en el periodo seleccionado. Ajusta los filtros de fecha o espera a que las sucursales empiecen a capturar.');
+  } else {
+    const sucTop=Object.entries(porSuc).sort((a,b)=>b[1].total-a[1].total)[0];
+    parrafos.push(`En el periodo hay <strong>${fmt(total)}</strong> en gasto operativo distribuidos en <strong>${gastos.length} movimientos</strong>. La sucursal con mayor gasto es <strong>${sucTop[0]}</strong> con ${fmt(sucTop[1].total)}.`);
+  }
+  if(topTipo.length>0){
+    const pct=total>0?((topTipo[0][1]/total)*100).toFixed(0):0;
+    parrafos.push(`La categoría con mayor peso es <strong>${topTipo[0][0]}</strong> con ${fmt(topTipo[0][1])} (${pct}% del gasto total del periodo).`);
+  }
+  if(bonifs.length>0){
+    const alertaBonif=bonifNoCuadran.length>0?` <span style="color:#f0a0a0;">⚠ ${bonifNoCuadran.length} bonificación(es) NO cuadran con lo pactado — revisar con el área comercial.</span>`:'Todas cuadran con lo pactado ✓';
+    parrafos.push(`Bonificaciones a clientes: <strong>${fmt(totalBonif)}</strong> en ${bonifs.length} registro(s). ${alertaBonif}`);
+  }
+  const alertas=[];
+  if(sinComp.length>0) alertas.push(`<span style="color:#f0a0a0;">🚫 ${sinComp.length} gasto(s) sin comprobante ni causa raíz — requieren atención inmediata.</span>`);
+  if(sinCapturarHoy.length>0) alertas.push(`<span style="color:#f0d080;">⏰ Las sucursales <strong>${sinCapturarHoy.join(', ')}</strong> no han capturado nada hoy.</span>`);
+  if(gastosMayores.length>0) alertas.push(`<span style="color:#f0d080;">⚡ ${gastosMayores.length} gasto(s) mayores a $10,000 en el periodo — verificar autorizaciones.</span>`);
+  if(fijosPend.length>0) alertas.push(`<span style="color:#f0d080;">📋 ${fijosPend.length} gasto(s) fijo(s) pendientes de pago este mes (${fmt(fijosPend.reduce((a,c)=>a+c.monto,0))}).</span>`);
+  if(conAutor.length>0) alertas.push(`<span style="color:#9eb8a8;">✓ ${conAutor.length} gasto(s) con autorización especial registrada.</span>`);
+  if(alertas.length>0) parrafos.push(alertas.join('<br>'));
+  if(sinComp.length===0&&sinCapturarHoy.length===0&&bonifNoCuadran.length===0){
+    parrafos.push('Todo en orden: sin alertas activas, todas las sucursales han capturado y los comprobantes están completos.');
+  }
+  return parrafos.join('<br><br>');
 }
 
-async function llamarAgente(preguntaUsuario=null){
-  const btn=$('preguntarBtn');
+function responderPregunta(pregunta){
+  const p=pregunta.toLowerCase();
+  const f=filtrar();
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
+  const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
+  const hoyStr=hoyISO();
+  if(p.includes('sucursal')&&(p.includes('más')||p.includes('mayor')||p.includes('mas'))){
+    const por={};['CDMX','Morelos','Puebla'].forEach(s=>{por[s]=gastos.filter(m=>m.sucursal===s).reduce((a,m)=>a+m.monto,0);});
+    return `Por sucursal:<br>${Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([s,v])=>`<strong>${s}:</strong> ${fmt(v)}`).join('<br>')}`;
+  }
+  if(p.includes('hoy')||p.includes('día')||p.includes('dia')){
+    const hoyMov=gastos.filter(m=>m.fecha===hoyStr);
+    const por={CDMX:0,Morelos:0,Puebla:0};hoyMov.forEach(m=>{por[m.sucursal]=(por[m.sucursal]||0)+m.monto;});
+    const sinHoy=['CDMX','Morelos','Puebla'].filter(s=>!hoyMov.find(m=>m.sucursal===s));
+    let resp=`Hoy: <strong>${fmt(hoyMov.reduce((a,m)=>a+m.monto,0))}</strong> en ${hoyMov.length} movimientos.<br>${Object.entries(por).filter(([,v])=>v>0).map(([s,v])=>`${s}: ${fmt(v)}`).join(' · ')}`;
+    if(sinHoy.length>0) resp+=`<br><span style="color:#f0d080;">⏰ Sin captura hoy: ${sinHoy.join(', ')}</span>`;
+    return resp;
+  }
+  if(p.includes('comprobante')||p.includes('falta')||p.includes('sin comprobar')){
+    const sc=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
+    if(!sc.length) return 'No hay gastos sin comprobante ni causa raíz. ✓';
+    return `<strong>${sc.length} gasto(s)</strong> sin comprobante ni causa raíz:<br>${sc.slice(0,5).map(m=>`${m.fecha} · ${m.sucursal} · ${m.concepto} · ${fmt(m.monto)}`).join('<br>')}${sc.length>5?`<br>…y ${sc.length-5} más`:''}`;
+  }
+  if(p.includes('bonific')){
+    if(!bonifs.length) return 'No hay bonificaciones en el periodo.';
+    const noCuadran=bonifs.filter(m=>m.bonifCuadra==='No');
+    let resp=`Bonificaciones: <strong>${fmt(bonifs.reduce((a,m)=>a+m.monto,0))}</strong> en ${bonifs.length} registro(s).`;
+    if(noCuadran.length) resp+=`<br><span style="color:#f0a0a0;">⚠ ${noCuadran.length} NO cuadran.</span>`;
+    else resp+='<br>Todas cuadran ✓';
+    return resp;
+  }
+  if(p.includes('categoría')||p.includes('categoria')||p.includes('tipo')){
+    const por={};gastos.forEach(m=>{por[m.tipo]=(por[m.tipo]||0)+m.monto;});
+    return `Top categorías:<br>${Object.entries(por).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t,v])=>`<strong>${t}:</strong> ${fmt(v)}`).join('<br>')}`;
+  }
+  if(p.includes('fijo')||p.includes('pendiente')){
+    const pend=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente');
+    if(!pend.length) return 'Todos los gastos fijos del mes están pagados ✓';
+    return `Fijos pendientes: <strong>${fmt(pend.reduce((a,c)=>a+c.monto,0))}</strong><br>${pend.slice(0,6).map(c=>`${c.concepto} · ${c.sucursal} · ${fmt(c.monto)}`).join('<br>')}`;
+  }
+  if(p.includes('autoriza')||p.includes('grande')){
+    const grandes=gastos.filter(m=>m.monto>=5000).sort((a,b)=>b.monto-a.monto);
+    if(!grandes.length) return 'No hay gastos mayores a $5,000 en el periodo.';
+    return `Gastos mayores a $5,000:<br>${grandes.slice(0,6).map(m=>`${m.fecha} · ${m.sucursal} · ${m.concepto} · <strong>${fmt(m.monto)}</strong> · Autorizó: ${m.autorizado||'—'}`).join('<br>')}`;
+  }
+  if(p.includes('capturista')||p.includes('quién')||p.includes('quien')){
+    const por={};gastos.forEach(m=>{por[m.capturista]=(por[m.capturista]||0)+m.monto;});
+    return `Por capturista:<br>${Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<strong>${c}:</strong> ${fmt(v)}`).join('<br>')}`;
+  }
+  return analizarDatos();
+}
+
+function analizarAuto(){
+  if(!sesion)return;
   const body=$('agenteBody');
   const sub=$('agenteSub');
-  btn.disabled=true;
-  if(!preguntaUsuario){
-    body.className='agente-body loading';
-    body.innerHTML='<div class="spin"></div><div>Analizando datos de Firebase...</div>';
-    sub.textContent='Analizando...';
-  }
-  const sistema=prepararContexto();
-  const msgs=preguntaUsuario
-    ?[...historial,{role:'user',content:preguntaUsuario}]
-    :[{role:'user',content:'Haz un análisis breve del estado actual de los gastos. Destaca lo más importante y cualquier anomalía.'}];
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:sistema,messages:msgs})});
-    const data=await res.json();
-    const txt=data.content?.[0]?.text||'No pude obtener respuesta.';
-    if(preguntaUsuario){
-      historial.push({role:'user',content:preguntaUsuario});
-      historial.push({role:'assistant',content:txt});
-      if(historial.length>20)historial=historial.slice(-20);
-      agregarMensajeHistorial(preguntaUsuario,txt);
-      $('pregunta').value='';
-    } else {
-      body.className='agente-body';
-      body.innerHTML=txt.replace(/\n/g,'<br>');
-      sub.textContent='Actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
-    }
-  }catch(e){
-    body.className='agente-body';
-    body.innerHTML='No se pudo conectar al agente. Verifica tu conexión.';
-    sub.textContent='Error de conexión';
-  }
-  btn.disabled=false;
+  body.className='agente-body';
+  body.innerHTML=analizarDatos();
+  sub.textContent='Actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
 }
 
 function agregarMensajeHistorial(pregunta,respuesta){
   const h=$('agenteHistorial');
   const div=document.createElement('div');
-  div.innerHTML=`<div class="msg-user"><div class="msg-label">Tú preguntaste</div>${pregunta}</div><div class="msg-agent"><div class="msg-label">Agente</div>${respuesta.replace(/\n/g,'<br>')}</div>`;
+  div.innerHTML=`<div class="msg-user"><div class="msg-label">Tú preguntaste</div>${pregunta}</div><div class="msg-agent"><div class="msg-label">Análisis</div>${respuesta}</div>`;
   h.appendChild(div);
   h.scrollTop=h.scrollHeight;
 }
 
-function analizarAuto(){
-  if(!sesion)return;
-  if(movimientos.length>0&&$('agenteBody').classList.contains('loading')){
-    llamarAgente();
-  }
-}
+$('analizarBtn').addEventListener('click',()=>{
+  const body=$('agenteBody');
+  const sub=$('agenteSub');
+  body.className='agente-body';
+  body.innerHTML=analizarDatos();
+  sub.textContent='Actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+});
+$('preguntarBtn').addEventListener('click',()=>{const p=$('pregunta').value.trim();if(!p)return;agregarMensajeHistorial(p,responderPregunta(p));$('pregunta').value='';});
+$('pregunta').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const p=$('pregunta').value.trim();if(p){agregarMensajeHistorial(p,responderPregunta(p));$('pregunta').value='';}}});
 
-$('analizarBtn').addEventListener('click',()=>llamarAgente());
-$('preguntarBtn').addEventListener('click',()=>{const p=$('pregunta').value.trim();if(p)llamarAgente(p);});
-$('pregunta').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const p=$('pregunta').value.trim();if(p)llamarAgente(p);}});
 
 /* ─── MENÚ DE REPORTES ─── */
 $('exportMenuBtn').addEventListener('click',e=>{
