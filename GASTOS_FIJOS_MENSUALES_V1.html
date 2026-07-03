@@ -73,18 +73,33 @@
 </head>
 <body>
 
+<!-- LOGIN -->
+<div id="loginOv" style="position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#1e3028,#141c18);display:flex;align-items:center;justify-content:center;z-index:300;">
+  <div style="background:#fff;border-radius:16px;padding:30px 26px;max-width:340px;width:90%;box-shadow:0 30px 60px rgba(0,0,0,.4);">
+    <div style="text-align:center;font-size:26px;margin-bottom:8px;">📋</div>
+    <h2 style="font-size:17px;font-weight:800;text-align:center;margin-bottom:4px;color:#141c18;">Gastos Fijos — Ferregama</h2>
+    <p style="font-size:12px;color:#8a857a;text-align:center;margin-bottom:18px;">Ingresa con tu usuario y contraseña</p>
+    <div id="loginErr" style="background:#fdecea;color:#c0392b;border:1px solid #e57373;border-radius:7px;padding:7px 10px;font-size:12px;font-weight:600;margin-bottom:11px;display:none;">Usuario o contraseña incorrectos</div>
+    <div style="margin-bottom:12px;"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8a857a;margin-bottom:4px;">Usuario</label><input type="text" id="loginUser" placeholder="Tu usuario" autocapitalize="none" style="width:100%;padding:9px 11px;border:1.5px solid #e2ddd4;border-radius:8px;background:#f0ede4;font-size:14px;font-family:inherit;"></div>
+    <div style="margin-bottom:16px;"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8a857a;margin-bottom:4px;">Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" style="width:100%;padding:9px 11px;border:1.5px solid #e2ddd4;border-radius:8px;background:#f0ede4;font-size:14px;font-family:inherit;"></div>
+    <button id="loginBtn" style="width:100%;padding:12px;border:none;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;box-shadow:0 4px 14px rgba(181,72,42,.3);">Entrar</button>
+  </div>
+</div>
+
 <div class="topbar">
   <div>
     <p class="eyebrow">Ferregama · Control de gastos</p>
     <h1>Gastos fijos mensuales</h1>
   </div>
   <div style="display:flex;align-items:center;gap:14px;">
-    <span style="font-size:10.5px;color:#bfb8a4;border:1px solid #46504a;padding:3px 9px;border-radius:12px;">v7 · Firebase</span>
+    <span id="userBadgeFijos" style="font-size:10px;background:rgba(181,72,42,.25);border:1px solid rgba(181,72,42,.4);color:#f0b8a0;padding:3px 9px;border-radius:20px;font-weight:700;display:none;"></span>
+    <span style="font-size:10.5px;color:#bfb8a4;border:1px solid #46504a;padding:3px 9px;border-radius:12px;">v9 · Firebase</span>
     <div class="mes-selector">
       <button id="mesAnterior">‹</button>
       <span id="mesActualTexto">Junio 2026</span>
       <button id="mesSiguiente">›</button>
     </div>
+    <button id="logoutBtn" style="display:none;padding:6px 12px;background:transparent;border:1px solid rgba(255,255,255,.2);color:#9eb8a8;border-radius:7px;font-size:11px;cursor:pointer;">Salir</button>
   </div>
 </div>
 
@@ -214,6 +229,36 @@ function catalogoDefault() {
 if (window.location.protocol === 'file:') {
   document.getElementById('fileProtocolBanner').style.display = 'block';
 }
+
+/* LOGIN */
+const $id=id=>document.getElementById(id);
+$id('loginBtn').addEventListener('click',doLoginFijos);
+$id('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLoginFijos();});
+async function doLoginFijos(){
+  const u=$id('loginUser').value.trim().toLowerCase();
+  const p=$id('loginPass').value;
+  $id('loginBtn').disabled=true;$id('loginBtn').textContent='Verificando...';
+  try{
+    const doc=await db.collection('usuarios').doc(u).get();
+    if(!doc.exists||doc.data().pass!==p||doc.data().estado==='inactivo'){
+      $id('loginErr').style.display='block';$id('loginBtn').disabled=false;$id('loginBtn').textContent='Entrar';return;
+    }
+    const data=doc.data();
+    if(data.rol==='capturista'&&data.usuario!=='claudia'&&data.usuario!=='lilian'&&data.usuario!=='erick'){
+      $id('loginErr').style.display='block';$id('loginErr').textContent='Solo admins pueden acceder a gastos fijos.';
+      $id('loginBtn').disabled=false;$id('loginBtn').textContent='Entrar';return;
+    }
+    sessionStorage.setItem('fg_fijos_ses',JSON.stringify({user:u,rol:data.rol}));
+    $id('loginOv').style.display='none';
+    $id('userBadgeFijos').textContent=u;$id('userBadgeFijos').style.display='inline';
+    $id('logoutBtn').style.display='block';
+    db.collection('usuarios').doc(u).update({ultimoAcceso:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+  }catch(e){$id('loginErr').style.display='block';$id('loginBtn').disabled=false;$id('loginBtn').textContent='Entrar';}
+}
+$id('logoutBtn').addEventListener('click',()=>{sessionStorage.removeItem('fg_fijos_ses');location.reload();});
+const sgFijos=sessionStorage.getItem('fg_fijos_ses');
+if(sgFijos){const s=JSON.parse(sgFijos);$id('loginOv').style.display='none';$id('userBadgeFijos').textContent=s.user;$id('userBadgeFijos').style.display='inline';$id('logoutBtn').style.display='block';}
+
 
 const firebaseConfig = {
   apiKey: "AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",
