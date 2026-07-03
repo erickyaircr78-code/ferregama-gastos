@@ -621,22 +621,34 @@ const GASOLINA=['gasolina','galosina','gasilona','gasdolina','gas jr','diesel'];
 $('concepto').addEventListener('input',e=>{
   const txt=e.target.value.toLowerCase();
   if(GASOLINA.some(w=>txt.includes(w))){
-    $('hint').className='hint show';$('hintTxt').textContent='⛽ La gasolina se registra en Efectivale, no aquí';
+    $('hint').className='hint show';
+    $('hintTxt').textContent='⛽ La gasolina se registra en Efectivale, no aquí';
+    $('hint').style.cursor='default';
     $('submitBtn').disabled=true;return;
   }
   $('submitBtn').disabled=false;
   if(txt.length<3){$('hint').className='hint';limpiarDots();return;}
   const m=CLASI.find(r=>r.w.some(w=>txt.includes(w)));
   if(m){
-    $('hint').className='hint show';$('hintTxt').textContent=m.t;
+    $('hint').className='hint show';
+    $('hintTxt').textContent=m.t+' — toca para aplicar';
+    $('hint').style.cursor='pointer';
+    $('hint').dataset.sugerido=m.t;
     limpiarDots();
     const dot=$(`dot-${m.t}`);if(dot)dot.style.display='block';
-    if(tipoSel!==m.t){
-      tipoSel=m.t;
-      document.querySelectorAll('.tipo-btn').forEach(b=>{b.classList.toggle('active',b.dataset.t===m.t);});
-      $('bonifExtra').style.display=m.t==='Bonificación a cliente'?'block':'none';
-    }
   } else {$('hint').className='hint';limpiarDots();}
+});
+// al tocar el chip aplica la sugerencia
+$('hint').addEventListener('click',()=>{
+  const sug=$('hint').dataset.sugerido;
+  if(!sug||sug.includes('Efectivale'))return;
+  tipoSel=sug;
+  document.querySelectorAll('.tipo-btn').forEach(b=>{b.classList.toggle('active',b.dataset.t===sug);});
+  $('bonifExtra').style.display=sug==='Bonificación a cliente'?'block':'none';
+  actualizarCausa();
+  $('hint').className='hint';
+  limpiarDots();
+  toast('Tipo aplicado: '+sug);
 });
 function limpiarDots(){document.querySelectorAll('.tip-dot').forEach(d=>d.style.display='none');}
 
@@ -670,12 +682,34 @@ $('bonifFotoInput').addEventListener('change',e=>{
 });
 $('quitarBonifFoto').addEventListener('click',()=>{bonifFoto=null;$('bonifFotoInput').value='';$('bonifFotoPrev').style.display='none';$('bonifFotoImg').src='';$('bonifFotoZ').childNodes[0].textContent='📷 Tomar foto o adjuntar imagen del listado';});
 
-/* CONTADOR FOLIOS */
+/* CONTADOR Y VALIDACIÓN DE FOLIOS */
+const SERIES_FOLIOS={
+  'CDMX':['AG','AGM','AGR','FVB','MVB','RB'],
+  'Puebla':['AG','AGM','AGR','FVB','MVB','RB'],
+  'Morelos':['AGM','GMR','ARM','FVC','RBC']
+};
+function validarFolio(folio,suc){
+  const f=folio.trim().toUpperCase();
+  if(!f)return false;
+  const series=SERIES_FOLIOS[suc]||[];
+  // ordenar de mayor a menor longitud para evitar que AG coincida antes que AGM
+  const seriesOrdenadas=[...series].sort((a,b)=>b.length-a.length);
+  return seriesOrdenadas.some(s=>f.startsWith(s)&&f.length>s.length&&/\d/.test(f.slice(s.length)));
+}
 $('bonifFolios').addEventListener('input',()=>{
   const txt=$('bonifFolios').value.trim();
-  if(!txt){$('foliosContador').textContent='0 folios';return;}
-  const folios=txt.split(/[\n,\s]+/).filter(f=>f.trim().length>0);
-  $('foliosContador').textContent=`${folios.length} folio(s)`;
+  const contador=$('foliosContador');
+  if(!txt){contador.textContent='0 folios';contador.style.color='var(--muted)';return;}
+  const folios=txt.split(/[\n,]+/).map(f=>f.trim()).filter(f=>f.length>0);
+  const suc=sesion?sesion.suc:'CDMX';
+  const invalidos=folios.filter(f=>!validarFolio(f,suc));
+  if(invalidos.length>0){
+    contador.innerHTML=`${folios.length} folio(s) — <span style="color:var(--danger);">⚠ ${invalidos.length} con formato incorrecto: ${invalidos.slice(0,3).join(', ')}${invalidos.length>3?'...':''}</span>`;
+    contador.style.color='var(--ink)';
+  } else {
+    contador.textContent=`${folios.length} folio(s) ✓`;
+    contador.style.color='var(--ok)';
+  }
 });
 
 /* COMPROBANTE */
@@ -737,7 +771,16 @@ $('submitBtn').addEventListener('click',async()=>{
     const cuadra=$('bonifCuadra').value;
     if(!cliente){msg.textContent='Escribe el nombre del cliente.';msg.className='status-msg err';$('bonifCliente').focus();return;}
     if(!monto||monto<=0){msg.textContent='El monto bonificado es obligatorio.';msg.className='status-msg err';$('monto').focus();return;}
+    const pct=parseFloat($('bonifPct').value);
+    if(!pct||pct<=0||pct>100){msg.textContent='El descuento pactado (%) es obligatorio y debe ser entre 1 y 100.';msg.className='status-msg err';$('bonifPct').focus();return;}
     if(!cuadra){msg.textContent='Indica si la bonificación cuadra con lo pactado.';msg.className='status-msg err';$('bonifCuadra').focus();return;}
+    // validar folios si los hay
+    const foliosRaw=$('bonifFolios').value.trim();
+    if(foliosRaw){
+      const folios=foliosRaw.split(/[\n,]+/).map(f=>f.trim()).filter(f=>f.length>0);
+      const invalidos=folios.filter(f=>!validarFolio(f,sesion.suc));
+      if(invalidos.length>0){msg.textContent=`Folios con formato incorrecto: ${invalidos.slice(0,3).join(', ')}. Revisa el formato de tu sucursal.`;msg.className='status-msg err';$('bonifFolios').focus();return;}
+    }
     // concepto automático para bonificación
     const conceptoAuto=`Bonificación a cliente: ${cliente}`;
     const mov={
@@ -747,7 +790,7 @@ $('submitBtn').addEventListener('click',async()=>{
       esBonificacion:true,
       bonifCliente:cliente,
       bonifCuenta:$('bonifCuenta').value.trim(),
-      bonifPct:parseFloat($('bonifPct').value)||0,
+      bonifPct:pct,
       bonifCuadra:cuadra,
       bonifFolios:$('bonifFolios').value.trim(),
       bonifFotoListado:bonifFoto||null
