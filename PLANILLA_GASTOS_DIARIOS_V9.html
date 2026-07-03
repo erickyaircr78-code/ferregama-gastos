@@ -322,7 +322,16 @@ tr:hover td{background:#faf8f3;}
                 <select id="bonifCuadra"><option value="">Selecciona</option><option value="Sí">Sí</option><option value="No">No</option></select>
               </div>
             </div>
-            <div class="fg" style="margin-bottom:0;"><label>Folios de factura</label><input type="text" id="bonifFolios" placeholder="Ej. F-1234, F-1235"></div>
+            <div class="fg" style="margin-bottom:8px;">
+              <label>Folios de factura — escribe, pega o separa por coma o Enter</label>
+              <textarea id="bonifFolios" placeholder="Ej. AG46404, AG46412, AG46432&#10;O pega aquí todos los folios de una vez..." rows="3" style="width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--field);font-size:13px;color:var(--ink);font-family:inherit;resize:vertical;transition:all .2s;"></textarea>
+              <div style="font-size:10px;color:var(--muted);margin-top:3px;" id="foliosContador">0 folios</div>
+            </div>
+            <div class="fg" style="margin-bottom:0;">
+              <label>Foto del listado de facturas (opcional)</label>
+              <div class="comp-z" id="bonifFotoZ" style="padding:11px;">📷 Tomar foto o adjuntar imagen del listado<input type="file" id="bonifFotoInput" accept="image/*,application/pdf" style="display:none;" capture="environment"></div>
+              <div id="bonifFotoPrev" style="display:none;margin-top:6px;"><img id="bonifFotoImg" src="" style="max-height:80px;border-radius:7px;border:1px solid var(--line);"><button type="button" class="ibtn" id="quitarBonifFoto" style="margin-left:6px;">✕ Quitar foto</button></div>
+            </div>
           </div>
 
           <div class="fg"><label>A quién se le dio / nombre</label><input type="text" id="persona" placeholder="Nombre de la persona" list="personasList" autocomplete="off"><datalist id="personasList"></datalist></div>
@@ -638,6 +647,27 @@ function revisarAuth(){
   wr.style.display=r.req?'block':'none';
 }
 
+/* FOTO LISTADO BONIFICACIÓN */
+let bonifFoto=null;
+$('bonifFotoZ').addEventListener('click',()=>$('bonifFotoInput').click());
+$('bonifFotoInput').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  if(file.type.startsWith('image/')){
+    comprimirImg(file,d=>{bonifFoto={tipo:'imagen',data:d,nombre:file.name};$('bonifFotoImg').src=d;$('bonifFotoImg').style.display='block';$('bonifFotoPrev').style.display='block';$('bonifFotoZ').childNodes[0].textContent='✅ Foto adjunta — toca para cambiar';});
+  } else if(file.type==='application/pdf'){
+    const r=new FileReader();r.onload=ev=>{bonifFoto={tipo:'pdf',data:ev.target.result,nombre:file.name};$('bonifFotoPrev').style.display='block';$('bonifFotoZ').childNodes[0].textContent='✅ PDF adjunto';};r.readAsDataURL(file);
+  }
+});
+$('quitarBonifFoto').addEventListener('click',()=>{bonifFoto=null;$('bonifFotoInput').value='';$('bonifFotoPrev').style.display='none';$('bonifFotoImg').src='';$('bonifFotoZ').childNodes[0].textContent='📷 Tomar foto o adjuntar imagen del listado';});
+
+/* CONTADOR FOLIOS */
+$('bonifFolios').addEventListener('input',()=>{
+  const txt=$('bonifFolios').value.trim();
+  if(!txt){$('foliosContador').textContent='0 folios';return;}
+  const folios=txt.split(/[\n,\s]+/).filter(f=>f.trim().length>0);
+  $('foliosContador').textContent=`${folios.length} folio(s)`;
+});
+
 /* COMPROBANTE */
 let comp=null,compEd=null;
 function comprimirImg(file,cb){const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const M=1000;let w=img.width,h=img.height;if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',.6));};img.src=e.target.result;};r.readAsDataURL(file);}
@@ -688,7 +718,7 @@ $('submitBtn').addEventListener('click',async()=>{
   if(r&&r.req&&!autorizado){msg.textContent='Este monto requiere seleccionar quién aprueba.';msg.className='status-msg err';return;}
   if(tipoSel==='Bonificación a cliente'&&!$('bonifCliente').value.trim()){msg.textContent='Escribe el nombre del cliente para la bonificación.';msg.className='status-msg err';return;}
   const mov={fecha:hoyISO(),tipo:tipoSel,sucursal:sesion.suc,persona:persona||'',concepto,monto,capturista:cap,autorizado:autorizado||'',causaRaiz:causaRaiz||'',comprobante:comp||null,esBonificacion:tipoSel==='Bonificación a cliente'};
-  if(tipoSel==='Bonificación a cliente'){mov.bonifCliente=$('bonifCliente').value.trim();mov.bonifCuenta=$('bonifCuenta').value.trim();mov.bonifPct=parseFloat($('bonifPct').value)||0;mov.bonifCuadra=$('bonifCuadra').value;mov.bonifFolios=$('bonifFolios').value.trim();}
+  if(tipoSel==='Bonificación a cliente'){mov.bonifCliente=$('bonifCliente').value.trim();mov.bonifCuenta=$('bonifCuenta').value.trim();mov.bonifPct=parseFloat($('bonifPct').value)||0;mov.bonifCuadra=$('bonifCuadra').value;mov.bonifFolios=$('bonifFolios').value.trim();mov.bonifFotoListado=bonifFoto||null;}
   btn.disabled=true;btn.textContent='Guardando...';
   try{
     await db.collection('movimientos').add({...mov,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
@@ -696,7 +726,8 @@ $('submitBtn').addEventListener('click',async()=>{
     toast(`Registrado: ${concepto} · ${fmt(monto)}`);
     msg.textContent='Movimiento guardado.';msg.className='status-msg ok';
     $('persona').value='';$('monto').value='';$('concepto').value='';$('autorizado').value='';$('causaRaiz').value='';
-    $('bonifCliente').value='';$('bonifCuenta').value='';$('bonifPct').value='';$('bonifCuadra').value='';$('bonifFolios').value='';
+    $('bonifCliente').value='';$('bonifCuenta').value='';$('bonifPct').value='';$('bonifCuadra').value='';$('bonifFolios').value='';$('foliosContador').textContent='0 folios';
+    bonifFoto=null;$('bonifFotoInput').value='';$('bonifFotoPrev').style.display='none';$('bonifFotoImg').src='';$('bonifFotoZ').childNodes[0].textContent='📷 Tomar foto o adjuntar imagen del listado';
     $('hint').className='hint';limpiarDots();limpiarComp();revisarAuth();$('concepto').focus();
     $('submitBtn').disabled=false;
   }catch(e){console.error(e);msg.textContent=String(e).includes('1048487')?'Foto muy grande. Intenta sin comprobante.':'Error al guardar. Verifica tu conexión.';msg.className='status-msg err';btn.disabled=false;btn.textContent='Registrar movimiento';}
