@@ -482,7 +482,7 @@ function renderTodo(){
     const tt={mantto:0,viat:0,nom:0,prest:0,otros:0};
     ms.forEach(m=>{if(m.tipo==='Vehículos: mantenimiento')tt.mantto+=m.monto;else if(m.tipo==='Viáticos/Foráneas')tt.viat+=m.monto;else if(m.tipo==='Nómina/Sueldos')tt.nom+=m.monto;else if(m.tipo==='Préstamo/Faltante a personal')tt.prest+=m.monto;else tt.otros+=m.monto;});
     const tot=Object.values(tt).reduce((a,b)=>a+b,0);
-    const hoyMov=ms.filter(m=>m.fecha===hoyISO()).length;
+    const hoyMov=f.filter(m=>m.sucursal===suc&&m.fecha===hoyISO()).length;
     return `<div class="suc-card"><h3>${suc} <small style="font-size:10px;color:var(--muted);font-weight:400;">${hoyMov} mov. hoy</small></h3>
       <div class="suc-row"><span>Veh: mantto</span><span>${fmt(tt.mantto)}</span></div>
       <div class="suc-row"><span>Viáticos</span><span>${fmt(tt.viat)}</span></div>
@@ -568,7 +568,8 @@ function analizarDatos(){
   const fijosPend=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente');
   const porSuc={};['CDMX','Morelos','Puebla'].forEach(s=>{
     const ms=gastos.filter(m=>m.sucursal===s);
-    porSuc[s]={total:ms.reduce((a,m)=>a+m.monto,0),count:ms.length,hoy:ms.filter(m=>m.fecha===hoyStr).length};
+    const msTotal=f.filter(m=>m.sucursal===s); // incluye bonificaciones
+    porSuc[s]={total:ms.reduce((a,m)=>a+m.monto,0),count:ms.length,hoy:msTotal.filter(m=>m.fecha===hoyStr).length};
   });
   const porTipo={};gastos.forEach(m=>{porTipo[m.tipo]=(porTipo[m.tipo]||0)+m.monto;});
   const topTipo=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
@@ -614,10 +615,12 @@ function responderPregunta(pregunta){
     return `Por sucursal:<br>${Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([s,v])=>`<strong>${s}:</strong> ${fmt(v)}`).join('<br>')}`;
   }
   if(p.includes('hoy')||p.includes('día')||p.includes('dia')){
-    const hoyMov=gastos.filter(m=>m.fecha===hoyStr);
-    const por={CDMX:0,Morelos:0,Puebla:0};hoyMov.forEach(m=>{por[m.sucursal]=(por[m.sucursal]||0)+m.monto;});
+    const hoyStr2=hoyISO();
+    const hoyMov=f.filter(m=>m.fecha===hoyStr2); // incluye bonificaciones
+    const hoyGastos=gastos.filter(m=>m.fecha===hoyStr2);
+    const por={CDMX:0,Morelos:0,Puebla:0};hoyGastos.forEach(m=>{por[m.sucursal]=(por[m.sucursal]||0)+m.monto;});
     const sinHoy=['CDMX','Morelos','Puebla'].filter(s=>!hoyMov.find(m=>m.sucursal===s));
-    let resp=`Hoy: <strong>${fmt(hoyMov.reduce((a,m)=>a+m.monto,0))}</strong> en ${hoyMov.length} movimientos.<br>${Object.entries(por).filter(([,v])=>v>0).map(([s,v])=>`${s}: ${fmt(v)}`).join(' · ')}`;
+    let resp=`Hoy: <strong>${fmt(hoyGastos.reduce((a,m)=>a+m.monto,0))}</strong> en gasto operativo (${hoyGastos.length} movimientos).<br>${Object.entries(por).filter(([,v])=>v>0).map(([s,v])=>`${s}: ${fmt(v)}`).join(' · ')}`;
     if(sinHoy.length>0) resp+=`<br><span style="color:#f0d080;">⏰ Sin captura hoy: ${sinHoy.join(', ')}</span>`;
     return resp;
   }
