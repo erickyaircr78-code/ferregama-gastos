@@ -326,6 +326,7 @@ tr:hover td{background:#faf8f3;}
               <label>Folios de factura — escribe, pega o separa por coma o Enter</label>
               <textarea id="bonifFolios" placeholder="Ej. AG46404, AG46412, AG46432&#10;O pega aquí todos los folios de una vez..." rows="3" style="width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;background:var(--field);font-size:13px;color:var(--ink);font-family:inherit;resize:vertical;transition:all .2s;"></textarea>
               <div style="font-size:10px;color:var(--muted);margin-top:3px;" id="foliosContador">0 folios</div>
+              <div id="foliosFormato" style="font-size:10px;color:var(--muted);margin-top:4px;padding:6px 9px;background:var(--field);border-radius:6px;border:1px solid var(--line);line-height:1.6;"></div>
             </div>
             <div class="fg" style="margin-bottom:0;">
               <label>Foto del listado de facturas (opcional)</label>
@@ -563,6 +564,14 @@ function iniciarSesion(){
   }
   if(sesion.rol!=='admin'){$('reinicioBtn').style.display='none';}
   $('capturista').value=sesion.user;
+  // mostrar formato de folios según sucursal
+  const formatosFolios={
+    'CDMX':'Formatos válidos CDMX: <strong>AG</strong>, <strong>AGM</strong>, <strong>AGR</strong>, <strong>FVB</strong>, <strong>MVB</strong>, <strong>RB</strong> + número. Ej: AG46404, FVB1023',
+    'Puebla':'Formatos válidos Puebla: <strong>AG</strong>, <strong>AGM</strong>, <strong>AGR</strong>, <strong>FVB</strong>, <strong>MVB</strong>, <strong>RB</strong> + número. Ej: AG46404, RB500',
+    'Morelos':'Formatos válidos Morelos: <strong>AGM</strong>, <strong>GMR</strong>, <strong>ARM</strong>, <strong>FVC</strong>, <strong>RBC</strong> + número. Ej: AGM1234, GMR050'
+  };
+  const divFormato=$('foliosFormato');
+  if(divFormato)divFormato.innerHTML=formatosFolios[sesion.suc]||'';
   restaurarSaldoInicial();
   suscribir();
 }
@@ -587,6 +596,7 @@ document.querySelectorAll('.tipo-btn:not(.bloqueado)').forEach(b=>b.addEventList
   b.classList.add('active');
   tipoSel=b.dataset.t;
   $('bonifExtra').style.display=tipoSel==='Bonificación a cliente'?'block':'none';
+  actualizarCausa();
   actualizarCausa();
 }));
 
@@ -674,7 +684,11 @@ function comprimirImg(file,cb){const r=new FileReader();r.onload=e=>{const img=n
 function procesarComp(file,modo){if(!file)return;if(file.type==='application/pdf'){const r=new FileReader();r.onload=ev=>{const obj={tipo:'pdf',data:ev.target.result,nombre:file.name};modo==='c'?(comp=obj,mostrarComp(obj)):((compEd=obj),renderEdComp());};r.readAsDataURL(file);}else if(file.type.startsWith('image/')){comprimirImg(file,d=>{const obj={tipo:'imagen',data:d,nombre:file.name};modo==='c'?(comp=obj,mostrarComp(obj)):((compEd=obj),renderEdComp());});}}
 function mostrarComp(obj){$('compZ').classList.add('filled');$('compZ').childNodes[0].textContent='✅ Comprobante listo';$('compPrev').style.display='block';if(obj.tipo==='imagen'){$('compImg').src=obj.data;$('compImg').style.display='block';$('compPdf').style.display='none';}else{$('compImg').style.display='none';$('compPdf').style.display='block';}actualizarCausa();}
 function limpiarComp(){comp=null;$('compInput').value='';$('compZ').classList.remove('filled');$('compZ').childNodes[0].textContent='📎 Tomar foto o subir imagen / PDF del ticket';$('compPrev').style.display='none';$('compImg').src='';$('compPdf').style.display='none';actualizarCausa();}
-function actualizarCausa(){$('causaWrap').style.display=!comp?'block':'none';}
+function actualizarCausa(){
+  // causa raíz no aplica para bonificaciones
+  if(tipoSel==='Bonificación a cliente'){$('causaWrap').style.display='none';return;}
+  $('causaWrap').style.display=!comp?'block':'none';
+}
 $('compZ').addEventListener('click',()=>$('compInput').click());
 $('compInput').addEventListener('change',e=>procesarComp(e.target.files[0],'c'));
 $('quitarComp').addEventListener('click',e=>{e.stopPropagation();limpiarComp();});
@@ -710,28 +724,75 @@ function suscribir(){
 /* SUBMIT */
 $('submitBtn').addEventListener('click',async()=>{
   if(!sesion)return;
-  const persona=$('persona').value.trim(),monto=parseFloat($('monto').value),concepto=$('concepto').value.trim(),cap=sesion.user,autorizado=$('autorizado').value.trim(),causaRaiz=$('causaRaiz').value;
+  const persona=$('persona').value.trim();
+  const monto=parseFloat($('monto').value);
+  const cap=sesion.user;
+  const autorizado=$('autorizado').value.trim();
+  const causaRaiz=$('causaRaiz').value;
   const msg=$('statusMsg'),btn=$('submitBtn');
-  if(!monto||monto<=0||!concepto){msg.textContent='Falta monto o concepto.';msg.className='status-msg err';return;}
+
+  // ── VALIDACIONES BONIFICACIÓN A CLIENTE ──
+  if(tipoSel==='Bonificación a cliente'){
+    const cliente=$('bonifCliente').value.trim();
+    const cuadra=$('bonifCuadra').value;
+    if(!cliente){msg.textContent='Escribe el nombre del cliente.';msg.className='status-msg err';$('bonifCliente').focus();return;}
+    if(!monto||monto<=0){msg.textContent='El monto bonificado es obligatorio.';msg.className='status-msg err';$('monto').focus();return;}
+    if(!cuadra){msg.textContent='Indica si la bonificación cuadra con lo pactado.';msg.className='status-msg err';$('bonifCuadra').focus();return;}
+    // concepto automático para bonificación
+    const conceptoAuto=`Bonificación a cliente: ${cliente}`;
+    const mov={
+      fecha:hoyISO(),tipo:tipoSel,sucursal:sesion.suc,
+      persona:persona||cliente,concepto:conceptoAuto,monto,
+      capturista:cap,autorizado:'',causaRaiz:'',comprobante:null,
+      esBonificacion:true,
+      bonifCliente:cliente,
+      bonifCuenta:$('bonifCuenta').value.trim(),
+      bonifPct:parseFloat($('bonifPct').value)||0,
+      bonifCuadra:cuadra,
+      bonifFolios:$('bonifFolios').value.trim(),
+      bonifFotoListado:bonifFoto||null
+    };
+    btn.disabled=true;btn.textContent='Guardando...';
+    try{
+      await db.collection('movimientos').add({...mov,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+      toast(`Bonificación registrada: ${cliente} · ${fmt(monto)}`);
+      msg.textContent='Bonificación guardada.';msg.className='status-msg ok';
+      $('persona').value='';$('monto').value='';$('autorizado').value='';
+      $('bonifCliente').value='';$('bonifCuenta').value='';$('bonifPct').value='';
+      $('bonifCuadra').value='';$('bonifFolios').value='';$('foliosContador').textContent='0 folios';
+      bonifFoto=null;$('bonifFotoInput').value='';$('bonifFotoPrev').style.display='none';
+      $('bonifFotoImg').src='';$('bonifFotoZ').childNodes[0].textContent='📷 Tomar foto o adjuntar imagen del listado';
+      $('hint').className='hint';limpiarDots();revisarAuth();$('bonifCliente').focus();
+    }catch(e){
+      console.error(e);
+      msg.textContent=String(e).includes('1048487')?'Foto muy grande. Intenta sin foto.':'Error al guardar. Verifica tu conexión.';
+      msg.className='status-msg err';
+    }finally{btn.disabled=false;btn.textContent='Registrar movimiento';}
+    return;
+  }
+
+  // ── VALIDACIONES GASTO NORMAL ──
+  const concepto=$('concepto').value.trim();
+  if(!monto||monto<=0){msg.textContent='El monto es obligatorio.';msg.className='status-msg err';$('monto').focus();return;}
+  if(!concepto){msg.textContent='El concepto es obligatorio.';msg.className='status-msg err';$('concepto').focus();return;}
   const r=AUTH.find(x=>monto>=x.min&&monto<=x.max);
   if(r&&r.lvl==='block'&&!autorizado){msg.textContent='Gasto bloqueado — selecciona quién lo autorizó.';msg.className='status-msg err';return;}
   if(r&&r.req&&!autorizado){msg.textContent='Este monto requiere seleccionar quién aprueba.';msg.className='status-msg err';return;}
-  if(tipoSel==='Bonificación a cliente'&&!$('bonifCliente').value.trim()){msg.textContent='Escribe el nombre del cliente para la bonificación.';msg.className='status-msg err';return;}
-  const mov={fecha:hoyISO(),tipo:tipoSel,sucursal:sesion.suc,persona:persona||'',concepto,monto,capturista:cap,autorizado:autorizado||'',causaRaiz:causaRaiz||'',comprobante:comp||null,esBonificacion:tipoSel==='Bonificación a cliente'};
-  if(tipoSel==='Bonificación a cliente'){mov.bonifCliente=$('bonifCliente').value.trim();mov.bonifCuenta=$('bonifCuenta').value.trim();mov.bonifPct=parseFloat($('bonifPct').value)||0;mov.bonifCuadra=$('bonifCuadra').value;mov.bonifFolios=$('bonifFolios').value.trim();mov.bonifFotoListado=bonifFoto||null;}
+  const mov={fecha:hoyISO(),tipo:tipoSel,sucursal:sesion.suc,persona:persona||'',concepto,monto,capturista:cap,autorizado:autorizado||'',causaRaiz:causaRaiz||'',comprobante:comp||null,esBonificacion:false};
   btn.disabled=true;btn.textContent='Guardando...';
   try{
     await db.collection('movimientos').add({...mov,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
     guardarCap(persona);
     toast(`Registrado: ${concepto} · ${fmt(monto)}`);
     msg.textContent='Movimiento guardado.';msg.className='status-msg ok';
-    $('persona').value='';$('monto').value='';$('concepto').value='';$('autorizado').value='';$('causaRaiz').value='';
-    $('bonifCliente').value='';$('bonifCuenta').value='';$('bonifPct').value='';$('bonifCuadra').value='';$('bonifFolios').value='';$('foliosContador').textContent='0 folios';
-    bonifFoto=null;$('bonifFotoInput').value='';$('bonifFotoPrev').style.display='none';$('bonifFotoImg').src='';$('bonifFotoZ').childNodes[0].textContent='📷 Tomar foto o adjuntar imagen del listado';
+    $('persona').value='';$('monto').value='';$('concepto').value='';
+    $('autorizado').value='';$('causaRaiz').value='';
     $('hint').className='hint';limpiarDots();limpiarComp();revisarAuth();$('concepto').focus();
-    $('submitBtn').disabled=false;
-  }catch(e){console.error(e);msg.textContent=String(e).includes('1048487')?'Foto muy grande. Intenta sin comprobante.':'Error al guardar. Verifica tu conexión.';msg.className='status-msg err';btn.disabled=false;btn.textContent='Registrar movimiento';}
-  finally{btn.textContent='Registrar movimiento';}
+  }catch(e){
+    console.error(e);
+    msg.textContent=String(e).includes('1048487')?'Foto muy grande. Intenta sin comprobante.':'Error al guardar. Verifica tu conexión.';
+    msg.className='status-msg err';
+  }finally{btn.disabled=false;btn.textContent='Registrar movimiento';}
 });
 
 /* MIS GASTOS */
@@ -801,9 +862,24 @@ $('edCompInput').addEventListener('change',e=>procesarComp(e.target.files[0],'e'
 $('edQuitarComp').addEventListener('click',()=>{compEd=null;renderEdComp();});
 $('guardarEd').addEventListener('click',async()=>{
   if(!idEd)return;
-  const monto=parseFloat($('edMonto').value),concepto=$('edConcepto').value.trim(),cap=$('edCapturista').value.trim(),fecha=$('edFecha').value;
-  if(!monto||!concepto||!cap||!fecha){toast('Revisa los campos obligatorios',false);return;}
-  try{await db.collection('movimientos').doc(idEd).update({tipo:$('edTipo').value,sucursal:$('edSuc').value,persona:$('edPersona').value.trim(),monto,concepto,fecha,capturista:cap,causaRaiz:$('edCausa').value.trim(),autorizado:$('edAutorizado').value.trim(),comprobante:compEd});$('modalEd').classList.remove('show');idEd=null;compEd=null;toast('Movimiento actualizado');}catch(e){toast('Error al guardar',false);}
+  const monto=parseFloat($('edMonto').value);
+  const concepto=$('edConcepto').value.trim();
+  const cap=$('edCapturista').value.trim();
+  const fecha=$('edFecha').value;
+  if(!monto||monto<=0){toast('El monto debe ser mayor a cero',false);return;}
+  if(!concepto){toast('El concepto es obligatorio',false);return;}
+  if(!cap){toast('El campo quién captura es obligatorio',false);return;}
+  if(!fecha){toast('La fecha es obligatoria',false);return;}
+  try{
+    await db.collection('movimientos').doc(idEd).update({
+      tipo:$('edTipo').value,sucursal:$('edSuc').value,
+      persona:$('edPersona').value.trim(),monto,concepto,fecha,
+      capturista:cap,causaRaiz:$('edCausa').value.trim(),
+      autorizado:$('edAutorizado').value.trim(),comprobante:compEd
+    });
+    $('modalEd').classList.remove('show');idEd=null;compEd=null;
+    toast('Movimiento actualizado');
+  }catch(e){toast('Error al guardar',false);}
 });
 
 /* REINICIO */
