@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gastos Fijos Mensuales v7 (Firebase) — Ferregama</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<style>
+  :root{
+    --ink:#1c2420;--paper:#f3f1ea;--card:#ffffff;--line:#dcd6c8;
+    --accent:#b5482a;--accent-dark:#8c3620;--ok:#3f6b46;--ok-bg:#e3f0e1;
+    --pend-bg:#fbe9c8;--pend-text:#8a5d0c;--muted:#7c7669;--field:#f0eee5;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--paper);color:var(--ink);}
+  .topbar{background:var(--ink);color:var(--paper);padding:16px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;}
+  .topbar h1{margin:0;font-size:19px;font-weight:700;}
+  .topbar .eyebrow{font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:#bfb8a4;margin:0;}
+  .mes-selector{display:flex;align-items:center;gap:10px;background:#2a342e;padding:8px 14px;border-radius:9px;}
+  .mes-selector button{background:transparent;border:none;color:#cfc8b6;font-size:16px;cursor:pointer;padding:2px 6px;}
+  .mes-selector span{color:#fff;font-weight:700;font-size:14px;min-width:140px;text-align:center;}
+
+  .wrap{max-width:1100px;margin:0 auto;padding:22px 28px 60px;}
+
+  .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px;}
+  .metric{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}
+  .metric .label{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0 0 4px;}
+  .metric .value{font-size:23px;font-weight:800;margin:0;}
+  .metric.pend .value{color:var(--pend-text);}
+  .metric.ok .value{color:var(--ok);}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-bottom:18px;}
+  .card-title{font-size:13px;font-weight:700;color:var(--accent-dark);text-transform:uppercase;letter-spacing:.06em;margin:0 0 16px;}
+
+  .add-row{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:8px;align-items:end;}
+  label{display:block;font-size:12px;font-weight:600;margin:0 0 5px;color:var(--muted);}
+  input,select{width:100%;padding:10px 11px;border:1.5px solid var(--line);border-radius:8px;background:var(--field);font-size:14px;color:var(--ink);font-family:inherit;}
+  input:focus,select:focus{outline:none;border-color:var(--accent);background:#fff;}
+  .btn-add{padding:10px 16px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;}
+
+  table{width:100%;border-collapse:collapse;font-size:13.5px;}
+  th{text-align:left;padding:10px 8px;background:var(--field);color:var(--muted);font-weight:700;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--line);}
+  td{padding:11px 8px;border-bottom:1px solid var(--line);}
+  .amount-cell{font-weight:700;text-align:right;}
+  .empty-row td{text-align:center;color:var(--muted);padding:30px 0;}
+
+  .estado-toggle{display:flex;gap:6px;}
+  .estado-btn{padding:6px 12px;border-radius:14px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--line);background:var(--field);color:var(--muted);}
+  .estado-btn.pagado.active{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);}
+  .estado-btn.pendiente.active{background:var(--pend-bg);border-color:var(--pend-text);color:var(--pend-text);}
+
+  .icon-btn{border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--muted);padding:4px 7px;border-radius:6px;}
+  .icon-btn:hover{background:var(--field);color:var(--accent);}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .btn-secondary{padding:10px 16px;background:transparent;border:1.5px solid var(--line);color:var(--ink);border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:10px;font-size:13.5px;font-weight:600;opacity:0;transition:all .25s;pointer-events:none;z-index:50;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .config-banner{background:#fce8d8;border:1px solid #e0a878;color:#7a3d12;font-size:12.5px;padding:11px 14px;border-radius:10px;margin-bottom:18px;line-height:1.45;}
+
+  .upload-zone{
+    border:1.5px dashed var(--line);border-radius:12px;padding:28px;text-align:center;
+    cursor:pointer;background:var(--field);
+  }
+  .upload-zone:hover{border-color:var(--accent);background:#fff;}
+  .upload-zone.dragover{border-color:var(--accent);background:#fce8d8;}
+  .table-wrap-preview{max-height:280px;overflow-y:auto;border:1px solid var(--line);border-radius:10px;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginOv" style="position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#1e3028,#141c18);display:flex;align-items:center;justify-content:center;z-index:300;">
+  <div style="background:#fff;border-radius:16px;padding:30px 26px;max-width:340px;width:90%;box-shadow:0 30px 60px rgba(0,0,0,.4);">
+    <div style="text-align:center;font-size:26px;margin-bottom:8px;">📋</div>
+    <h2 style="font-size:17px;font-weight:800;text-align:center;margin-bottom:4px;color:#141c18;">Gastos Fijos — Ferregama</h2>
+    <p style="font-size:12px;color:#8a857a;text-align:center;margin-bottom:18px;">Ingresa con tu usuario y contraseña</p>
+    <div id="loginErr" style="background:#fdecea;color:#c0392b;border:1px solid #e57373;border-radius:7px;padding:7px 10px;font-size:12px;font-weight:600;margin-bottom:11px;display:none;">Usuario o contraseña incorrectos</div>
+    <div style="margin-bottom:12px;"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8a857a;margin-bottom:4px;">Usuario</label><input type="text" id="loginUser" placeholder="Tu usuario" autocapitalize="none" style="width:100%;padding:9px 11px;border:1.5px solid #e2ddd4;border-radius:8px;background:#f0ede4;font-size:14px;font-family:inherit;"></div>
+    <div style="margin-bottom:16px;"><label style="display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8a857a;margin-bottom:4px;">Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" style="width:100%;padding:9px 11px;border:1.5px solid #e2ddd4;border-radius:8px;background:#f0ede4;font-size:14px;font-family:inherit;"></div>
+    <button id="loginBtn" style="width:100%;padding:12px;border:none;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;box-shadow:0 4px 14px rgba(181,72,42,.3);">Entrar</button>
+  </div>
+</div>
+
+<div class="topbar">
+  <div>
+    <p class="eyebrow">Ferregama · Control de gastos</p>
+    <h1>Gastos fijos mensuales</h1>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <span id="userBadgeFijos" style="font-size:10px;background:rgba(181,72,42,.25);border:1px solid rgba(181,72,42,.4);color:#f0b8a0;padding:3px 9px;border-radius:20px;font-weight:700;display:none;"></span>
+    <span style="font-size:10.5px;color:#bfb8a4;border:1px solid #46504a;padding:3px 9px;border-radius:12px;">v9 · Firebase</span>
+    <div class="mes-selector">
+      <button id="mesAnterior">‹</button>
+      <span id="mesActualTexto">Junio 2026</span>
+      <button id="mesSiguiente">›</button>
+    </div>
+    <button id="logoutBtn" style="display:none;padding:6px 12px;background:transparent;border:1px solid rgba(255,255,255,.2);color:#9eb8a8;border-radius:7px;font-size:11px;cursor:pointer;">Salir</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="config-banner" id="fileProtocolBanner" style="display:none;background:#fbdede;border-color:#d98a8a;color:#7a1f1f;">
+    <strong>⚠ Este archivo se abrió directamente (doble clic), no a través del servidor.</strong>
+    Así no puede conectarse a la base de datos. Cierra esta pestaña y entra escribiendo
+    <code style="background:#fff;padding:2px 6px;border-radius:4px;">http://localhost:8000/GASTOS_FIJOS_MENSUALES_V1.html</code>
+    en la barra de direcciones, con la ventana del servidor (símbolo del sistema) abierta.
+  </div>
+
+  <div class="config-banner">
+    <strong>Catálogo genérico de inicio.</strong> Ya incluí renta, luz, agua e internet por sucursal. Agrega aquí los pagos fijos que te falten (teléfono, seguros, sueldos administrativos, software, etc.) y se guardan para todos los meses siguientes.
+  </div>
+
+  <div class="metrics">
+    <div class="metric"><p class="label">Total fijo del mes</p><p class="value" id="totMes">$0</p></div>
+    <div class="metric ok"><p class="label">Pagado</p><p class="value" id="totPagado">$0</p></div>
+    <div class="metric pend"><p class="label">Pendiente</p><p class="value" id="totPendiente">$0</p></div>
+  </div>
+
+  <div class="card">
+    <p class="card-title">Cargar archivo de Claudia</p>
+    <p style="font-size:13px;color:var(--muted);margin:0 0 14px;">
+      Sube el Excel o CSV con los pagos fijos del mes. Debe tener columnas con concepto, sucursal, monto y, si aplica, día de pago.
+      Antes de agregarlo al catálogo te muestro una vista previa para que confirmes.
+    </p>
+    <div class="upload-zone" id="uploadZone">
+      <p style="margin:0 0 8px;font-weight:700;">Arrastra el archivo aquí o haz clic para seleccionarlo</p>
+      <p style="margin:0;font-size:12.5px;color:var(--muted);">Formatos: .xlsx, .xls, .csv</p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+    </div>
+
+    <div id="previewWrap" style="display:none;margin-top:18px;">
+      <p class="card-title" style="margin-bottom:10px;">Vista previa — confirma antes de agregar</p>
+      <div class="table-wrap-preview">
+        <table>
+          <thead>
+            <tr><th>Concepto</th><th>Sucursal</th><th>Día de pago</th><th style="text-align:right;">Monto</th></tr>
+          </thead>
+          <tbody id="previewBody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px;">
+        <button class="btn-add" id="confirmarImportBtn">Agregar al catálogo</button>
+        <button class="btn-secondary" id="cancelarImportBtn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <p class="card-title">Agregar pago fijo manual</p>
+    <div class="add-row">
+      <div>
+        <label for="nuevoConcepto">Concepto</label>
+        <input type="text" id="nuevoConcepto" placeholder="Ej. Renta CDMX, Internet Morelos..." list="conceptosFijosList">
+        <datalist id="conceptosFijosList">
+          <option value="Renta"><option value="Luz"><option value="Agua"><option value="Internet">
+          <option value="Teléfono"><option value="Seguro"><option value="Software / sistemas">
+        </datalist>
+      </div>
+      <div>
+        <label for="nuevaSucursal">Sucursal</label>
+        <select id="nuevaSucursal">
+          <option value="CDMX">CDMX</option>
+          <option value="Morelos">Morelos</option>
+          <option value="Puebla">Puebla</option>
+          <option value="General">General (todas)</option>
+        </select>
+      </div>
+      <div>
+        <label for="nuevoMonto">Monto</label>
+        <input type="number" id="nuevoMonto" step="0.01" placeholder="0.00">
+      </div>
+      <div>
+        <label for="nuevoDia">Día de pago</label>
+        <input type="number" id="nuevoDia" min="1" max="31" placeholder="Ej. 5">
+      </div>
+      <button class="btn-add" id="addBtn">Agregar</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toolbar">
+      <p class="card-title" style="margin:0;">Pagos fijos del mes</p>
+      <button class="btn-secondary" id="exportBtn">Exportar a Excel</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>Concepto</th><th>Sucursal</th><th>Día de pago</th><th style="text-align:right;">Monto</th><th>Estado</th><th></th>
+        </tr>
+      </thead>
+      <tbody id="tablaBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"><span id="toastText"></span></div>
+
+<script>
+const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+let hoy = new Date();
+let mesActual = hoy.getMonth();
+let anioActual = hoy.getFullYear();
+
+function catalogoDefault() {
+  return [
+    { id: 'c1', concepto: 'Renta', sucursal: 'CDMX', monto: 0, dia: 5 },
+    { id: 'c2', concepto: 'Luz', sucursal: 'CDMX', monto: 0, dia: 10 },
+    { id: 'c3', concepto: 'Agua', sucursal: 'CDMX', monto: 0, dia: 10 },
+    { id: 'c4', concepto: 'Internet', sucursal: 'CDMX', monto: 0, dia: 15 },
+    { id: 'c5', concepto: 'Renta', sucursal: 'Morelos', monto: 0, dia: 5 },
+    { id: 'c6', concepto: 'Luz', sucursal: 'Morelos', monto: 0, dia: 10 },
+    { id: 'c7', concepto: 'Agua', sucursal: 'Morelos', monto: 0, dia: 10 },
+    { id: 'c8', concepto: 'Internet', sucursal: 'Morelos', monto: 0, dia: 15 },
+    { id: 'c9', concepto: 'Renta', sucursal: 'Puebla', monto: 0, dia: 5 },
+    { id: 'c10', concepto: 'Luz', sucursal: 'Puebla', monto: 0, dia: 10 },
+    { id: 'c11', concepto: 'Agua', sucursal: 'Puebla', monto: 0, dia: 10 },
+    { id: 'c12', concepto: 'Internet', sucursal: 'Puebla', monto: 0, dia: 15 }
+  ];
+}
+
+if (window.location.protocol === 'file:') {
+  document.getElementById('fileProtocolBanner').style.display = 'block';
+}
+
+/* LOGIN */
+const $id=id=>document.getElementById(id);
+$id('loginBtn').addEventListener('click',doLoginFijos);
+$id('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLoginFijos();});
+async function doLoginFijos(){
+  const u=$id('loginUser').value.trim().toLowerCase();
+  const p=$id('loginPass').value;
+  $id('loginBtn').disabled=true;$id('loginBtn').textContent='Verificando...';
+  try{
+    const doc=await db.collection('usuarios').doc(u).get();
+    if(!doc.exists||doc.data().pass!==p||doc.data().estado==='inactivo'){
+      $id('loginErr').style.display='block';$id('loginBtn').disabled=false;$id('loginBtn').textContent='Entrar';return;
+    }
+    const data=doc.data();
+    if(data.rol==='capturista'&&data.usuario!=='claudia'&&data.usuario!=='lilian'&&data.usuario!=='erick'){
+      $id('loginErr').style.display='block';$id('loginErr').textContent='Solo admins pueden acceder a gastos fijos.';
+      $id('loginBtn').disabled=false;$id('loginBtn').textContent='Entrar';return;
+    }
+    sessionStorage.setItem('fg_fijos_ses',JSON.stringify({user:u,rol:data.rol}));
+    $id('loginOv').style.display='none';
+    $id('userBadgeFijos').textContent=u;$id('userBadgeFijos').style.display='inline';
+    $id('logoutBtn').style.display='block';
+    db.collection('usuarios').doc(u).update({ultimoAcceso:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+  }catch(e){$id('loginErr').style.display='block';$id('loginBtn').disabled=false;$id('loginBtn').textContent='Entrar';}
+}
+$id('logoutBtn').addEventListener('click',()=>{sessionStorage.removeItem('fg_fijos_ses');location.reload();});
+const sgFijos=sessionStorage.getItem('fg_fijos_ses');
+if(sgFijos){const s=JSON.parse(sgFijos);$id('loginOv').style.display='none';$id('userBadgeFijos').textContent=s.user;$id('userBadgeFijos').style.display='inline';$id('logoutBtn').style.display='block';}
+
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",
+  authDomain: "ferregama-gastos.firebaseapp.com",
+  projectId: "ferregama-gastos",
+  storageBucket: "ferregama-gastos.firebasestorage.app",
+  messagingSenderId: "561677307493",
+  appId: "1:561677307493:web:adb5284746c1dac3e3408c"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let catalogo = [];
+let estados = {};
+let catalogoInicializado = false;
+
+async function inicializarCatalogoSiVacio() {
+  const snap = await db.collection('fijos_catalogo').limit(1).get();
+  if (snap.empty) {
+    const batch = db.batch();
+    catalogoDefault().forEach(item => {
+      const ref = db.collection('fijos_catalogo').doc();
+      batch.set(ref, { concepto: item.concepto, sucursal: item.sucursal, monto: item.monto, dia: item.dia });
+    });
+    await batch.commit();
+  }
+}
+
+function suscribirCatalogoYEstados() {
+  db.collection('fijos_catalogo').onSnapshot((snapshot) => {
+    catalogo = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    renderTodo();
+  }, (error) => console.error('Error leyendo catálogo:', error));
+
+  db.collection('fijos_estados').doc('global').onSnapshot((doc) => {
+    estados = doc.exists ? doc.data() : {};
+    renderTodo();
+  }, (error) => console.error('Error leyendo estados:', error));
+}
+
+async function agregarConceptoDB(item) {
+  await db.collection('fijos_catalogo').add(item);
+}
+
+async function eliminarConceptoDB(id) {
+  await db.collection('fijos_catalogo').doc(id).delete();
+}
+
+async function guardarEstadoDB(clave, valor) {
+  await db.collection('fijos_estados').doc('global').set({ [clave]: valor }, { merge: true });
+}
+
+function claveMes() { return `${anioActual}-${String(mesActual+1).padStart(2,'0')}`; }
+function claveEstado(id) { return `${claveMes()}_${id}`; }
+
+let filasImportadas = [];
+
+function normalizarTexto(t) {
+  return String(t || '').toLowerCase().trim()
+    .replace(/[áàä]/g,'a').replace(/[éèë]/g,'e').replace(/[íìï]/g,'i')
+    .replace(/[óòö]/g,'o').replace(/[úùü]/g,'u').replace(/ñ/g,'n');
+}
+
+function detectarColumna(headers, candidatos) {
+  for (const h of headers) {
+    const norm = normalizarTexto(h);
+    if (candidatos.some(c => norm.includes(c))) return h;
+  }
+  return null;
+}
+
+function normalizarSucursal(valor) {
+  const v = normalizarTexto(valor);
+  if (v.includes('cdmx') || v.includes('mexico')) return 'CDMX';
+  if (v.includes('morelos') || v.includes('cuernavaca')) return 'Morelos';
+  if (v.includes('puebla')) return 'Puebla';
+  if (v.includes('general') || v.includes('todas')) return 'General';
+  return 'General';
+}
+
+function procesarArchivo(file) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+      if (!filas.length) {
+        mostrarToast("El archivo no tiene datos legibles");
+        return;
+      }
+
+      const headers = Object.keys(filas[0]);
+      const colConcepto = detectarColumna(headers, ['concepto', 'descripcion', 'gasto', 'nombre']);
+      const colSucursal = detectarColumna(headers, ['sucursal', 'plaza', 'branch']);
+      const colMonto = detectarColumna(headers, ['monto', 'importe', 'cantidad', 'total']);
+      const colDia = detectarColumna(headers, ['dia', 'fecha de pago', 'fecha pago']);
+
+      if (!colConcepto || !colMonto) {
+        mostrarToast("No encontré columnas de concepto y monto en el archivo");
+        return;
+      }
+
+      filasImportadas = filas.map(f => ({
+        concepto: String(f[colConcepto] || '').trim(),
+        sucursal: colSucursal ? normalizarSucursal(f[colSucursal]) : 'General',
+        monto: parseFloat(f[colMonto]) || 0,
+        dia: colDia ? (parseInt(f[colDia]) || null) : null
+      })).filter(f => f.concepto && f.monto > 0);
+
+      if (!filasImportadas.length) {
+        mostrarToast("No se encontraron renglones válidos con concepto y monto");
+        return;
+      }
+
+      mostrarVistaPrevia();
+    } catch (err) {
+      mostrarToast("No se pudo leer el archivo. Verifica el formato.");
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function mostrarVistaPrevia() {
+  document.getElementById('previewWrap').style.display = 'block';
+  document.getElementById('previewBody').innerHTML = filasImportadas.map(f => `
+    <tr>
+      <td>${f.concepto}</td>
+      <td>${f.sucursal}</td>
+      <td>${f.dia ? 'Día ' + f.dia : '—'}</td>
+      <td class="amount-cell">${formatoMoneda(f.monto)}</td>
+    </tr>
+  `).join('');
+}
+
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+
+uploadZone.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', (e) => {
+  if (e.target.files.length) procesarArchivo(e.target.files[0]);
+});
+
+uploadZone.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadZone.classList.add('dragover');
+});
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) procesarArchivo(e.dataTransfer.files[0]);
+});
+
+document.getElementById('confirmarImportBtn').addEventListener('click', async () => {
+  try {
+    const batch = db.batch();
+    filasImportadas.forEach(f => {
+      const ref = db.collection('fijos_catalogo').doc();
+      batch.set(ref, { concepto: f.concepto, sucursal: f.sucursal, monto: f.monto, dia: f.dia });
+    });
+    await batch.commit();
+    filasImportadas = [];
+    document.getElementById('previewWrap').style.display = 'none';
+    fileInput.value = '';
+    mostrarToast("Pagos fijos agregados desde el archivo");
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Error al guardar. Verifica tu conexión.");
+  }
+});
+
+document.getElementById('cancelarImportBtn').addEventListener('click', () => {
+  filasImportadas = [];
+  document.getElementById('previewWrap').style.display = 'none';
+  fileInput.value = '';
+});
+
+function formatoMoneda(n) {
+  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n || 0);
+}
+
+function mostrarToast(texto) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastText').textContent = texto;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2400);
+}
+
+document.getElementById('mesAnterior').addEventListener('click', () => {
+  mesActual--;
+  if (mesActual < 0) { mesActual = 11; anioActual--; }
+  renderTodo();
+});
+document.getElementById('mesSiguiente').addEventListener('click', () => {
+  mesActual++;
+  if (mesActual > 11) { mesActual = 0; anioActual++; }
+  renderTodo();
+});
+
+document.getElementById('addBtn').addEventListener('click', async () => {
+  const concepto = document.getElementById('nuevoConcepto').value.trim();
+  const sucursal = document.getElementById('nuevaSucursal').value;
+  const monto = parseFloat(document.getElementById('nuevoMonto').value);
+  const dia = parseInt(document.getElementById('nuevoDia').value) || null;
+
+  if (!concepto || !monto || monto <= 0) {
+    mostrarToast("Falta concepto o monto válido");
+    return;
+  }
+
+  try {
+    await agregarConceptoDB({ concepto, sucursal, monto, dia });
+    document.getElementById('nuevoConcepto').value = '';
+    document.getElementById('nuevoMonto').value = '';
+    document.getElementById('nuevoDia').value = '';
+    mostrarToast("Pago fijo agregado");
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Error al guardar. Verifica tu conexión.");
+  }
+});
+
+async function eliminarConcepto(id) {
+  try {
+    await eliminarConceptoDB(id);
+    mostrarToast("Pago fijo eliminado del catálogo");
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Error al eliminar. Verifica tu conexión.");
+  }
+}
+
+async function toggleEstado(id, valor) {
+  try {
+    await guardarEstadoDB(claveEstado(id), valor);
+  } catch (err) {
+    console.error(err);
+    mostrarToast("Error al actualizar estado. Verifica tu conexión.");
+  }
+}
+
+function renderTodo() {
+  document.getElementById('mesActualTexto').textContent = `${MESES[mesActual]} ${anioActual}`;
+
+  let totalMes = 0, totalPagado = 0, totalPendiente = 0;
+  const tbody = document.getElementById('tablaBody');
+
+  if (!catalogo.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No hay pagos fijos en el catálogo todavía.</td></tr>`;
+  } else {
+    tbody.innerHTML = catalogo.map(c => {
+      const estado = estados[claveEstado(c.id)] || 'pendiente';
+      totalMes += c.monto;
+      if (estado === 'pagado') totalPagado += c.monto; else totalPendiente += c.monto;
+      return `
+        <tr>
+          <td>${c.concepto}</td>
+          <td>${c.sucursal}</td>
+          <td>${c.dia ? 'Día ' + c.dia : '—'}</td>
+          <td class="amount-cell">${formatoMoneda(c.monto)}</td>
+          <td>
+            <div class="estado-toggle">
+              <button class="estado-btn pagado ${estado === 'pagado' ? 'active' : ''}" onclick="toggleEstado('${c.id}','pagado')">Pagado</button>
+              <button class="estado-btn pendiente ${estado === 'pendiente' ? 'active' : ''}" onclick="toggleEstado('${c.id}','pendiente')">Pendiente</button>
+            </div>
+          </td>
+          <td><button class="icon-btn" onclick="eliminarConcepto('${c.id}')" title="Eliminar del catálogo">✕</button></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  document.getElementById('totMes').textContent = formatoMoneda(totalMes);
+  document.getElementById('totPagado').textContent = formatoMoneda(totalPagado);
+  document.getElementById('totPendiente').textContent = formatoMoneda(totalPendiente);
+}
+
+document.getElementById('exportBtn').addEventListener('click', () => {
+  if (!catalogo.length) { mostrarToast("No hay datos para exportar"); return; }
+  const datos = catalogo.map(c => ({
+    Mes: `${MESES[mesActual]} ${anioActual}`,
+    Concepto: c.concepto,
+    Sucursal: c.sucursal,
+    'Día de pago': c.dia || '',
+    Monto: c.monto,
+    Estado: (estados[claveEstado(c.id)] || 'pendiente')
+  }));
+  const ws = XLSX.utils.json_to_sheet(datos);
+  ws['!cols'] = [{wch:16},{wch:22},{wch:12},{wch:12},{wch:12},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Gastos fijos");
+  XLSX.writeFile(wb, `Gastos_Fijos_${MESES[mesActual]}_${anioActual}.xlsx`);
+  mostrarToast("Excel exportado");
+});
+
+inicializarCatalogoSiVacio().then(() => {
+  suscribirCatalogoYEstados();
+});
+</script>
+
+</body>
+</html>
