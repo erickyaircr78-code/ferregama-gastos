@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manual de Usuario — Ferregama Gastos</title>
+<style>
+:root{
+  --ink:#141c18;--paper:#f4f2eb;--card:#fff;--line:#e2ddd4;
+  --accent:#b5482a;--accent2:#8c3620;
+  --ok:#2e7d45;--ok-bg:#e6f4eb;
+  --warn:#c07a00;--warn-bg:#fff3d6;
+  --danger:#c0392b;--danger-bg:#fdecea;
+  --muted:#8a857a;--field:#f0ede4;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--paper);color:var(--ink);line-height:1.6;}
+
+/* PORTADA */
+.portada{background:linear-gradient(135deg,#141c18,#1e3028);color:#fff;padding:60px 40px;text-align:center;min-height:280px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+.portada .logo{font-size:52px;}
+.portada h1{font-size:28px;font-weight:900;letter-spacing:-.02em;}
+.portada p{font-size:14px;color:#9eb8a8;max-width:500px;}
+.portada .fecha{font-size:11px;color:#5a8070;margin-top:8px;}
+
+/* ÍNDICE */
+.indice{background:var(--card);border-bottom:2px solid var(--line);padding:20px 40px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;top:0;z-index:20;box-shadow:0 2px 12px rgba(0,0,0,.08);}
+.indice a{font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;padding:5px 12px;border-radius:20px;border:1.5px solid var(--line);transition:all .15s;}
+.indice a:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+
+/* CONTENIDO */
+.contenido{max-width:900px;margin:0 auto;padding:32px 24px 80px;}
+
+/* SECCIÓN */
+.seccion{margin-bottom:48px;}
+.sec-header{display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--accent);}
+.sec-num{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;flex-shrink:0;}
+.sec-title{font-size:20px;font-weight:800;}
+.sec-sub{font-size:12px;color:var(--muted);}
+
+/* PASOS */
+.pasos{display:flex;flex-direction:column;gap:14px;}
+.paso{display:flex;gap:14px;align-items:flex-start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;}
+.paso-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;margin-top:1px;}
+.paso-body h4{font-size:14px;font-weight:700;margin-bottom:4px;}
+.paso-body p{font-size:13px;color:var(--muted);line-height:1.5;}
+.paso-body .tip{background:var(--ok-bg);border-left:3px solid var(--ok);padding:8px 12px;border-radius:0 8px 8px 0;font-size:12.5px;color:var(--ok);margin-top:8px;font-weight:600;}
+.paso-body .alerta{background:var(--warn-bg);border-left:3px solid var(--warn);padding:8px 12px;border-radius:0 8px 8px 0;font-size:12.5px;color:var(--warn);margin-top:8px;font-weight:600;}
+.paso-body .peligro{background:var(--danger-bg);border-left:3px solid var(--danger);padding:8px 12px;border-radius:0 8px 8px 0;font-size:12.5px;color:var(--danger);margin-top:8px;font-weight:600;}
+
+/* MOCK PANTALLA */
+.mock{background:#f8f6f0;border:2px solid var(--line);border-radius:14px;overflow:hidden;margin:18px 0;box-shadow:0 4px 20px rgba(0,0,0,.08);}
+.mock-bar{background:#1e2a22;padding:10px 16px;display:flex;align-items:center;gap:8px;}
+.mock-bar .dots{display:flex;gap:5px;}
+.mock-bar .dot{width:10px;height:10px;border-radius:50%;}
+.mock-bar .dot.r{background:#ff5f56;}
+.mock-bar .dot.y{background:#ffbd2e;}
+.mock-bar .dot.g{background:#27c93f;}
+.mock-url{flex:1;background:rgba(255,255,255,.1);border-radius:6px;padding:4px 10px;font-size:11px;color:#9eb8a8;font-family:monospace;}
+.mock-body{padding:16px;}
+
+/* TOPBAR MOCK */
+.m-topbar{background:#141c18;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;border-radius:8px;margin-bottom:12px;}
+.m-topbar-l{font-size:11px;}
+.m-topbar-l .ey{color:#9eb8a8;font-size:9px;text-transform:uppercase;letter-spacing:.1em;}
+.m-topbar-l .title{font-weight:700;font-size:13px;}
+.m-nav{display:flex;gap:4px;}
+.m-nav-btn{padding:5px 11px;border-radius:6px;font-size:10px;font-weight:600;color:#9eb8a8;}
+.m-nav-btn.active{background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;}
+
+/* TIPOS MOCK */
+.m-tipos{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin-bottom:10px;}
+.m-tipo{background:#f0ede4;border:1.5px solid #e2ddd4;border-radius:8px;padding:8px 4px;text-align:center;font-size:9px;font-weight:700;color:#8a857a;}
+.m-tipo.activo{background:linear-gradient(135deg,#5a7d99,#23394a);color:#fff;border-color:transparent;}
+.m-tipo.bonif{background:linear-gradient(135deg,#d94f3a,#b03a28);color:#fff;border-color:transparent;grid-column:span 2;}
+.m-tipo.bloq{opacity:.5;position:relative;}
+.m-tipo .ico{font-size:14px;display:block;margin-bottom:2px;}
+
+/* CAMPOS MOCK */
+.m-campo{margin-bottom:8px;}
+.m-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#8a857a;margin-bottom:3px;}
+.m-input{background:#f0ede4;border:1.5px solid #e2ddd4;border-radius:7px;padding:7px 10px;font-size:12px;color:#141c18;width:100%;}
+.m-input.filled{background:#fff;border-color:#b5482a;}
+.m-btn{width:100%;padding:11px;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:800;margin-top:8px;}
+.m-alerta-warn{background:#fff3d6;border:1.5px solid #f0c040;border-radius:8px;padding:8px 10px;font-size:10px;color:#c07a00;font-weight:600;margin-bottom:8px;}
+.m-alerta-ok{background:#e6f4eb;border:1.5px solid #a8d8b2;border-radius:8px;padding:8px 10px;font-size:10px;color:#2e7d45;font-weight:600;margin-bottom:8px;}
+.m-causa{background:#fff3d6;border:1.5px solid #f0c040;border-radius:8px;padding:8px 10px;margin-bottom:8px;}
+.m-causa p{font-size:10px;font-weight:700;color:#c07a00;margin-bottom:4px;}
+.m-select{background:#fff;border:1.5px solid #f0c040;border-radius:6px;padding:5px 8px;font-size:11px;width:100%;}
+
+/* LOGIN MOCK */
+.m-login{background:radial-gradient(circle at 30% 20%,#1e3028,#141c18);padding:24px;display:flex;align-items:center;justify-content:center;border-radius:10px;margin-bottom:12px;}
+.m-login-box{background:#fff;border-radius:12px;padding:20px;width:220px;text-align:center;}
+.m-login-box .logo{font-size:24px;margin-bottom:6px;}
+.m-login-box h3{font-size:13px;font-weight:800;margin-bottom:4px;}
+.m-login-box p{font-size:10px;color:#8a857a;margin-bottom:12px;}
+
+/* TABLA MOCK */
+.m-tabla{width:100%;border-collapse:collapse;font-size:10px;}
+.m-tabla th{background:#f0ede4;padding:6px 8px;text-align:left;font-weight:700;color:#8a857a;text-transform:uppercase;font-size:9px;letter-spacing:.05em;}
+.m-tabla td{padding:6px 8px;border-bottom:1px solid #e2ddd4;}
+.m-badge{padding:2px 7px;border-radius:8px;font-size:9px;font-weight:800;}
+.m-badge.mantto{background:#5a7d99;color:#fff;}
+.m-badge.bonif{background:#d94f3a;color:#fff;}
+.m-badge.viat{background:#c8a020;color:#5a4500;}
+
+/* DASHBOARD MOCK */
+.m-hero-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;}
+.m-hero{background:#fff;border:1px solid #e2ddd4;border-radius:8px;padding:10px;}
+.m-hero .lbl{font-size:8px;font-weight:800;text-transform:uppercase;color:#8a857a;margin-bottom:3px;letter-spacing:.05em;}
+.m-hero .val{font-size:16px;font-weight:900;}
+.m-hero.t .val{color:#8c3620;}
+.m-hero.b .val{color:#c0392b;}
+.m-hero.w .val{color:#c07a00;}
+.m-agente{background:linear-gradient(135deg,#141c18,#1e3028);border-radius:10px;padding:14px;margin-bottom:10px;}
+.m-agente-hdr{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.m-agente-ic{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#b5482a,#8c3620);display:flex;align-items:center;justify-content:center;font-size:13px;}
+.m-agente-txt{font-size:11px;font-weight:700;color:#fff;}
+.m-agente-sub{font-size:9px;color:#9eb8a8;}
+.m-agente-body{background:rgba(255,255,255,.06);border-radius:8px;padding:10px;font-size:10.5px;color:#e8f0ec;line-height:1.6;margin-bottom:8px;}
+.m-agente-qa{display:flex;gap:6px;}
+.m-agente-input{flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:6px;padding:6px 8px;font-size:10px;color:#9eb8a8;}
+.m-agente-btn{padding:6px 10px;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;border:none;border-radius:6px;font-size:10px;font-weight:700;}
+
+/* TABLA USUARIOS */
+.tabla-usuarios{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:12px;}
+.tabla-usuarios th{background:var(--field);padding:8px 10px;text-align:left;font-weight:800;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);border-bottom:2px solid var(--line);}
+.tabla-usuarios td{padding:8px 10px;border-bottom:1px solid var(--line);}
+.rol-admin{background:#fff3d6;color:var(--warn);padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:800;}
+.rol-cap{background:var(--ok-bg);color:var(--ok);padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:800;}
+.rol-view{background:var(--field);color:var(--muted);padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:800;}
+
+/* GRID 2 */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0;}
+@media(max-width:600px){.grid2{grid-template-columns:1fr;}}
+
+/* CALLOUT */
+.callout{border-radius:10px;padding:14px 16px;margin:14px 0;font-size:13px;line-height:1.55;}
+.callout.ok{background:var(--ok-bg);border-left:4px solid var(--ok);color:var(--ok);}
+.callout.warn{background:var(--warn-bg);border-left:4px solid var(--warn);color:var(--warn);}
+.callout.danger{background:var(--danger-bg);border-left:4px solid var(--danger);color:var(--danger);}
+.callout strong{display:block;margin-bottom:3px;}
+
+/* PRINT */
+@media print{.indice{display:none;}.portada{min-height:auto;padding:40px;}.contenido{padding:20px;}}
+</style>
+</head>
+<body>
+
+<!-- PORTADA -->
+<div class="portada">
+  <div class="logo">🏪</div>
+  <h1>Manual de usuario<br>Sistema de Control de Gastos</h1>
+  <p>Guía paso a paso para capturistas, administradores y dirección de Ferregama</p>
+  <div class="fecha">Versión 9 · Julio 2026</div>
+</div>
+
+<!-- ÍNDICE -->
+<div class="indice">
+  <span style="font-size:11px;font-weight:700;color:var(--muted);margin-right:4px;">Ir a:</span>
+  <a href="#s1">1. Acceso</a>
+  <a href="#s2">2. Captura de gastos</a>
+  <a href="#s3">3. Bonificaciones</a>
+  <a href="#s4">4. Mis gastos</a>
+  <a href="#s5">5. Consolidado</a>
+  <a href="#s6">6. Dashboard</a>
+  <a href="#s7">7. Gastos fijos</a>
+  <a href="#s8">8. Usuarios</a>
+  <a href="#s9">9. Preguntas frecuentes</a>
+</div>
+
+<div class="contenido">
+
+<!-- SECCIÓN 1: ACCESO -->
+<div class="seccion" id="s1">
+  <div class="sec-header">
+    <div class="sec-num">1</div>
+    <div><div class="sec-title">Cómo entrar al sistema</div><div class="sec-sub">Login, URLs y roles de usuario</div></div>
+  </div>
+
+  <div class="callout warn"><strong>⚠ Importante</strong>El sistema vive en internet. Solo necesitas el navegador de tu celular o computadora — no hay que instalar nada.</div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>Abre la URL en tu navegador</h4>
+        <p>Escribe o pega esta dirección según lo que necesitas hacer:</p>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;">
+          <div style="background:var(--field);border-radius:8px;padding:10px 14px;font-size:12px;">
+            <div style="font-weight:800;color:var(--accent);margin-bottom:2px;">📋 Captura de gastos (todas las sucursales)</div>
+            <code style="font-size:11px;color:var(--muted);">erickyaircr78-code.github.io/ferregama-gastos/PLANILLA_GASTOS_DIARIOS_V9.html</code>
+          </div>
+          <div style="background:var(--field);border-radius:8px;padding:10px 14px;font-size:12px;">
+            <div style="font-weight:800;color:var(--accent);margin-bottom:2px;">📊 Dashboard del director (Pepe, Lilian, Erick)</div>
+            <code style="font-size:11px;color:var(--muted);">erickyaircr78-code.github.io/ferregama-gastos/DASHBOARD_DIRECTOR_V9.html</code>
+          </div>
+          <div style="background:var(--field);border-radius:8px;padding:10px 14px;font-size:12px;">
+            <div style="font-weight:800;color:var(--accent);margin-bottom:2px;">📅 Gastos fijos mensuales (Claudia, Lilian, Erick)</div>
+            <code style="font-size:11px;color:var(--muted);">erickyaircr78-code.github.io/ferregama-gastos/GASTOS_FIJOS_MENSUALES_V1.html</code>
+          </div>
+        </div>
+        <div class="tip">💡 Guarda la URL como favorito en tu celular para entrar rápido cada día.</div>
+      </div>
+    </div>
+
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Ingresa tu usuario y contraseña</h4>
+        <p>Al abrir la URL aparece esta pantalla. Escribe tu nombre de usuario (en minúsculas) y tu contraseña.</p>
+        <div class="mock">
+          <div class="mock-bar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><div class="mock-url">erickyaircr78-code.github.io/ferregama-gastos/PLANILLA...</div></div>
+          <div class="mock-body">
+            <div class="m-login">
+              <div class="m-login-box">
+                <div class="logo">🏪</div>
+                <h3>Ferregama · Gastos</h3>
+                <p>Ingresa con tu usuario y contraseña</p>
+                <div style="margin-bottom:8px;text-align:left;"><div class="m-label">Usuario</div><div class="m-input filled">miriam</div></div>
+                <div style="margin-bottom:10px;text-align:left;"><div class="m-label">Contraseña</div><div class="m-input filled">••••••••••</div></div>
+                <div class="m-btn">Entrar</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tip">✓ Una vez que entras, el sistema recuerda tu sesión mientras tengas el navegador abierto.</div>
+      </div>
+    </div>
+
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>Tabla de usuarios y accesos</h4>
+        <p>Cada persona tiene su propio usuario, contraseña y sucursal asignada.</p>
+        <table class="tabla-usuarios">
+          <thead><tr><th>Usuario</th><th>Sucursal</th><th>Rol</th><th>Acceso a</th></tr></thead>
+          <tbody>
+            <tr><td>miriam</td><td>CDMX</td><td><span class="rol-cap">Capturista</span></td><td>Captura + Mis gastos</td></tr>
+            <tr><td>claudia</td><td>CDMX</td><td><span class="rol-cap">Capturista</span></td><td>Captura + Mis gastos + Gastos fijos</td></tr>
+            <tr><td>lilian</td><td>CDMX</td><td><span class="rol-admin">Admin</span></td><td>Todo + Admin usuarios</td></tr>
+            <tr><td>pepe</td><td>CDMX</td><td><span class="rol-view">Viewer</span></td><td>Dashboard (solo lectura)</td></tr>
+            <tr><td>erick</td><td>CDMX</td><td><span class="rol-admin">Admin</span></td><td>Todo + Admin usuarios</td></tr>
+            <tr><td>alexis</td><td>Morelos</td><td><span class="rol-cap">Capturista</span></td><td>Captura + Mis gastos</td></tr>
+            <tr><td>jennifer</td><td>Morelos</td><td><span class="rol-cap">Capturista</span></td><td>Captura + Mis gastos</td></tr>
+            <tr><td>karen</td><td>Morelos</td><td><span class="rol-cap">Capturista</span></td><td>Captura + Mis gastos</td></tr>
+            <tr><td>ricardo</td><td>Puebla</td><td><span class="rol-cap">Capturista</span></td><td>Captura + Mis gastos</td></tr>
+            <tr><td>nancy</td><td>Puebla</td><td><span class="rol-cap">Capturista</span></td><td>Captura + Mis gastos</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 2: CAPTURA -->
+<div class="seccion" id="s2">
+  <div class="sec-header">
+    <div class="sec-num">2</div>
+    <div><div class="sec-title">Cómo capturar un gasto</div><div class="sec-sub">Paso a paso para registrar cualquier movimiento de efectivo</div></div>
+  </div>
+
+  <div class="callout ok"><strong>✓ Regla principal</strong>Todo gasto en efectivo que salga de la caja debe capturarse en el momento, con monto, concepto y comprobante (foto del ticket o PDF).</div>
+
+  <div class="mock" style="margin-bottom:20px;">
+    <div class="mock-bar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><div class="mock-url">Planilla de gastos diarios — v9 · Firebase · miriam · CDMX</div></div>
+    <div class="mock-body">
+      <div class="m-topbar"><div class="m-topbar-l"><div class="ey">Ferregama · Control de gastos</div><div class="title">Planilla de gastos diarios</div></div><div class="m-nav"><div class="m-nav-btn active">Captura</div><div class="m-nav-btn">Mis gastos</div><div class="m-nav-btn">Consolidado</div></div></div>
+      <div style="display:grid;grid-template-columns:1.1fr 1fr;gap:10px;">
+        <div>
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#b5482a;margin-bottom:8px;">1 · Tipo de movimiento</div>
+          <div class="m-tipos">
+            <div class="m-tipo bonif"><span class="ico">📋</span>Bonificación a cliente</div>
+            <div class="m-tipo"><span class="ico">💰</span>Bono/Extra</div>
+            <div class="m-tipo"><span class="ico">💳</span>Nómina</div>
+            <div class="m-tipo activo"><span class="ico">🔧</span>Vehículos: mantto</div>
+            <div class="m-tipo bloq"><span class="ico">⛽</span>Gasolina 🔒</div>
+            <div class="m-tipo"><span class="ico">🛣️</span>Casetas</div>
+            <div class="m-tipo"><span class="ico">✈️</span>Viáticos</div>
+            <div class="m-tipo"><span class="ico">🛡️</span>Custodia</div>
+          </div>
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#b5482a;margin-bottom:5px;margin-top:8px;">2 · Sucursal</div>
+          <div style="background:#f0ede4;border:1.5px solid #e2ddd4;border-radius:7px;padding:7px 10px;font-size:11px;font-weight:800;color:#8c3620;">CDMX <span style="float:right;font-size:9px;color:#8a857a;font-weight:400;">Para cambiarla, cierra y reabre</span></div>
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:#b5482a;margin-bottom:8px;">3 · Detalle del gasto</div>
+          <div class="m-campo"><div class="m-label">A quién se le dio</div><div class="m-input filled">Roberto Sánchez</div></div>
+          <div class="m-campo"><div class="m-label">Monto</div><div class="m-input filled" style="font-size:16px;font-weight:800;">$ 3,500</div></div>
+          <div class="m-alerta-ok">✦ Sugerido: Vehículos: mantenimiento — toca para aplicar</div>
+          <div class="m-campo"><div class="m-label">Concepto</div><div class="m-input filled">Balatas camioneta 2013</div></div>
+          <div class="m-campo"><div class="m-label">Comprobante (opcional)</div><div class="m-input" style="text-align:center;color:#8a857a;">📎 Tomar foto o subir ticket</div></div>
+          <div class="m-btn">Registrar movimiento</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>Selecciona el tipo de movimiento</h4>
+        <p>Toca el botón que mejor describe el gasto. Hay 15 tipos disponibles. La <strong>Gasolina está bloqueada</strong> — esa viene de Efectivale, no se captura aquí.</p>
+        <div class="tip">💡 Si empiezas a escribir el concepto, el sistema sugiere el tipo automáticamente. Toca el chip verde para aplicarlo.</div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Escribe a quién se le dio el dinero</h4>
+        <p>Nombre de la persona que recibió el efectivo (chofer, proveedor, empleado). No es obligatorio pero ayuda para los reportes.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>Captura el monto</h4>
+        <p>Escribe el monto exacto. Si el gasto supera ciertos montos, el sistema muestra una alerta automática:</p>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">
+          <div class="m-alerta-warn">⚡ Mayor a $5,000 — Solicita cotización y aprobación de Pepe o Claudia antes de pagar</div>
+          <div style="background:var(--danger-bg);border:1.5px solid #e57373;border-radius:8px;padding:8px 10px;font-size:10px;color:var(--danger);font-weight:600;">⚠ Mayor a $10,000 — Autoriza: Lilian García (campo obligatorio)</div>
+          <div style="background:var(--danger-bg);border:2px solid var(--danger);border-radius:8px;padding:8px 10px;font-size:10px;color:var(--danger);font-weight:800;">🚫 Mayor a $20,000 — Autoriza: José Ramón García (Pepe). Bloqueado hasta seleccionar.</div>
+        </div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">4</div>
+      <div class="paso-body">
+        <h4>Escribe el concepto</h4>
+        <p>Describe brevemente el gasto. Ej: "Balatas camioneta 2013", "Papelería oficina", "Viáticos foránea Tlaxcala".</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">5</div>
+      <div class="paso-body">
+        <h4>Adjunta el comprobante (cuando tengas)</h4>
+        <p>Toca el botón de comprobante y toma foto del ticket o factura con la cámara del celular. Si no hay comprobante físico, el sistema pide el motivo:</p>
+        <div class="m-causa">
+          <p>⚠ Sin comprobante — ¿cuál es el motivo?</p>
+          <select class="m-select">
+            <option>Caseta/TAG</option>
+            <option>Ponchadura/llanta</option>
+            <option>Mordida policía</option>
+            <option>Estacionamiento</option>
+            <option>Taxi chofer</option>
+            <option>Garrafón/insumo</option>
+            <option>Otro</option>
+          </select>
+        </div>
+        <div class="alerta">⚠ Los gastos sin comprobante ni causa raíz aparecen marcados en el dashboard de Pepe como alertas rojas.</div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">6</div>
+      <div class="paso-body">
+        <h4>Toca "Registrar movimiento"</h4>
+        <p>El gasto se guarda en Firebase en tiempo real. Pepe y Lilian lo ven al instante en su dashboard.</p>
+        <div class="tip">✓ Si no tienes internet en el momento, el gasto se guarda localmente y se sube automáticamente cuando regrese la señal.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 3: BONIFICACIONES -->
+<div class="seccion" id="s3">
+  <div class="sec-header">
+    <div class="sec-num">3</div>
+    <div><div class="sec-title">Cómo registrar una bonificación a cliente</div><div class="sec-sub">Las bonificaciones NO son gasto — van en su propio bloque</div></div>
+  </div>
+
+  <div class="callout danger"><strong>🚫 Importante</strong>Las bonificaciones a clientes NO suman en los totales de gasto operativo. Van separadas para poder conciliarlas con el área comercial.</div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>Selecciona "Bonificación a cliente"</h4>
+        <p>Es el botón grande rojo en la esquina superior izquierda de los tipos de movimiento. Al seleccionarlo aparecen campos adicionales específicos para bonificaciones.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Llena los campos de la bonificación</h4>
+        <p>Todos estos campos son obligatorios:</p>
+        <div style="background:var(--danger-bg);border:1.5px solid #e57373;border-radius:10px;padding:12px;margin-top:8px;">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;color:var(--danger);margin-bottom:8px;">Datos de la bonificación (no es gasto)</div>
+          <div class="grid2" style="margin:0 0 8px;">
+            <div><div class="m-label">Cliente *</div><div class="m-input filled">Andrea Hernández</div></div>
+            <div><div class="m-label">Número de cuenta</div><div class="m-input filled">11486</div></div>
+          </div>
+          <div class="grid2" style="margin:0 0 8px;">
+            <div><div class="m-label">Descuento pactado (%) *</div><div class="m-input filled">8</div></div>
+            <div><div class="m-label">¿Cuadra con lo pactado? *</div><div class="m-input filled">Sí</div></div>
+          </div>
+          <div><div class="m-label">Folios de factura</div><div class="m-input" style="height:60px;resize:vertical;">AG46404, AG46412, AG46432</div></div>
+          <div style="font-size:9px;color:#b54878;margin-top:3px;">Formatos CDMX: AG, AGM, AGR, FVB, MVB, RB + número · Morelos: AGM, GMR, ARM, FVC, RBC + número</div>
+        </div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>Agrega foto del listado (opcional)</h4>
+        <p>Si tienes el listado impreso de facturas, toma foto y adjúntala. Sirve como respaldo visual aunque no sea obligatorio.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">4</div>
+      <div class="paso-body">
+        <h4>Captura el monto total bonificado y registra</h4>
+        <p>El monto es el total de lo que se bonificó al cliente. El concepto se llena automático con el nombre del cliente.</p>
+        <div class="tip">✓ En el dashboard de Pepe aparecen en su propio bloque de conciliación, separado del gasto operativo.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 4: MIS GASTOS -->
+<div class="seccion" id="s4">
+  <div class="sec-header">
+    <div class="sec-num">4</div>
+    <div><div class="sec-title">Ver y corregir mis gastos</div><div class="sec-sub">Pestaña "Mis gastos" — solo tus registros de tu sucursal</div></div>
+  </div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>Toca la pestaña "Mis gastos"</h4>
+        <p>Aquí ves solo los gastos que tú capturaste en tu sucursal. Puedes filtrar por fecha o ver el historial completo.</p>
+        <div class="mock" style="margin-top:10px;">
+          <div class="mock-body" style="padding:12px;">
+            <div class="m-topbar" style="margin-bottom:8px;"><div style="font-size:11px;font-weight:700;color:#fff;">Mis gastos — CDMX</div><div style="display:flex;gap:5px;"><div style="background:rgba(255,255,255,.1);color:#9eb8a8;padding:4px 8px;border-radius:5px;font-size:9px;">Solo hoy</div><div style="background:rgba(255,255,255,.1);color:#9eb8a8;padding:4px 8px;border-radius:5px;font-size:9px;">Quitar filtro</div></div></div>
+            <table class="m-tabla" style="width:100%;">
+              <thead><tr><th>Fecha</th><th>Tipo</th><th>Concepto</th><th>Monto</th><th></th></tr></thead>
+              <tbody>
+                <tr><td>02/jul</td><td><span class="m-badge mantto">Veh: mantto</span></td><td>Balatas camioneta</td><td style="font-weight:800;">$3,500</td><td>✎ ✕</td></tr>
+                <tr><td>02/jul</td><td><span class="m-badge viat">Viáticos</span></td><td>Comida choferes ⚠</td><td style="font-weight:800;">$850</td><td>✎ ✕</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Corregir un error de captura</h4>
+        <p>Si te equivocaste en el monto o el concepto, toca el ícono de lápiz <strong>✎</strong> en la fila del movimiento. Se abre un formulario para editarlo.</p>
+        <div class="alerta">⚠ Solo puedes editar tus propios registros. Los admins (Lilian, Erick) pueden editar cualquier registro.</div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>Significado del ícono ⚠</h4>
+        <p>Si ves una advertencia junto al concepto, significa que ese gasto no tiene comprobante ni causa raíz registrada. Pepe lo ve en rojo en su dashboard. Edítalo para agregar la causa raíz o el comprobante.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 5: CONSOLIDADO -->
+<div class="seccion" id="s5">
+  <div class="sec-header">
+    <div class="sec-num">5</div>
+    <div><div class="sec-title">Consolidado</div><div class="sec-sub">Vista completa de las 3 sucursales — solo admins</div></div>
+  </div>
+
+  <div class="callout warn"><strong>⚠ Acceso restringido</strong>La pestaña Consolidado solo la ven Lilian y Erick (admins). Los capturistas solo ven sus propios gastos en "Mis gastos".</div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>Filtros disponibles</h4>
+        <p>Puedes filtrar por tipo de movimiento, sucursal, capturista y fecha. Combínalos para ver exactamente lo que necesitas.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Exportar a Excel</h4>
+        <p>Toca el botón <strong>"Exportar Excel"</strong> para descargar todos los movimientos filtrados en un archivo Excel con todas las columnas.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>Botón "⚠ Reiniciar"</h4>
+        <p>Borra todos los movimientos, catálogo de fijos y estados de pago. <strong>Solo Erick puede usarlo.</strong> Los usuarios y contraseñas no se tocan.</p>
+        <div class="peligro">🚫 Esta acción no se puede deshacer. Úsala solo para limpiar datos de prueba antes del arranque real.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 6: DASHBOARD -->
+<div class="seccion" id="s6">
+  <div class="sec-header">
+    <div class="sec-num">6</div>
+    <div><div class="sec-title">Dashboard del director</div><div class="sec-sub">Vista ejecutiva en tiempo real para Pepe, Lilian y Erick</div></div>
+  </div>
+
+  <div class="mock" style="margin-bottom:20px;">
+    <div class="mock-bar"><div class="dots"><div class="dot r"></div><div class="dot y"></div><div class="dot g"></div></div><div class="mock-url">Dashboard Director v9 · Firebase — pepe · jueves, 2 jul 2026</div></div>
+    <div class="mock-body">
+      <div class="m-agente">
+        <div class="m-agente-hdr">
+          <div class="m-agente-ic">✦</div>
+          <div><div class="m-agente-txt">Agente de análisis — Ferregama Gastos</div><div class="m-agente-sub">Actualizado 09:15 p.m.</div></div>
+          <button style="margin-left:auto;padding:4px 8px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#9eb8a8;border-radius:5px;font-size:9px;">Analizar ahora</button>
+        </div>
+        <div class="m-agente-body">En el periodo hay <strong>$28,450</strong> en gasto operativo en 14 movimientos. La categoría con mayor peso es <strong>Vehículos: mantenimiento</strong> con $8,200 (29% del total).<br><br><span style="color:#f0a0a0;">🚫 2 gastos sin comprobante ni causa raíz — requieren atención inmediata.</span><br><span style="color:#9eb8a8;">✓ 1 gasto con autorización especial registrada.</span></div>
+        <div class="m-agente-qa"><input class="m-agente-input" placeholder="¿Cuánto gastamos hoy? ¿Qué sucursal tiene más sin comprobar?"><button class="m-agente-btn">Preguntar ↗</button></div>
+      </div>
+      <div class="m-hero-grid">
+        <div class="m-hero t"><div class="lbl">Gasto diario</div><div class="val">$28,450</div></div>
+        <div class="m-hero b"><div class="lbl">Bonificaciones</div><div class="val">$41,200</div></div>
+        <div class="m-hero w"><div class="lbl">Fijos pendientes</div><div class="val">$0</div></div>
+        <div class="m-hero"><div class="lbl">Sin comprobar</div><div class="val" style="color:var(--danger);">2</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>Agente de análisis</h4>
+        <p>Al entrar al dashboard, el agente analiza automáticamente los datos y muestra un resumen con alertas. También puedes hacerle preguntas en lenguaje natural:</p>
+        <div style="margin-top:8px;background:var(--field);border-radius:8px;padding:10px 14px;font-size:12px;">
+          <div style="font-weight:700;margin-bottom:6px;color:var(--muted);">Ejemplos de preguntas que puedes hacerle:</div>
+          <div style="display:flex;flex-direction:column;gap:4px;color:var(--ink);">
+            <div>• "¿Qué sucursal gastó más esta semana?"</div>
+            <div>• "¿Hay gastos sin comprobante?"</div>
+            <div>• "¿Cuánto llevamos hoy?"</div>
+            <div>• "¿Las bonificaciones cuadran con lo pactado?"</div>
+            <div>• "¿Qué categoría pesa más?"</div>
+            <div>• "¿Qué fijos están pendientes de pago?"</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Filtros de fecha y sucursal</h4>
+        <p>Usa los botones <strong>"Solo hoy"</strong> y <strong>"Esta semana"</strong> para ver el periodo que necesitas. También puedes filtrar por sucursal específica.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>6 tipos de reporte en Excel</h4>
+        <p>Toca el botón <strong>"⬇ Descargar reporte"</strong> y elige el que necesitas:</p>
+        <div style="display:flex;flex-direction:column;gap:5px;margin-top:8px;">
+          <div style="background:var(--field);border-radius:7px;padding:8px 12px;font-size:12px;"><strong>📊 Concentrado ejecutivo</strong> — Todo en un archivo: resumen + detalle + bonificaciones</div>
+          <div style="background:var(--field);border-radius:7px;padding:8px 12px;font-size:12px;"><strong>🏪 Por sucursal</strong> — Una hoja por cada sucursal con sus totales</div>
+          <div style="background:var(--field);border-radius:7px;padding:8px 12px;font-size:12px;"><strong>📂 Mensual por categoría</strong> — Las 15 categorías vs las 3 sucursales</div>
+          <div style="background:var(--field);border-radius:7px;padding:8px 12px;font-size:12px;"><strong>📋 Bonificaciones</strong> — Conciliación por cliente con estado ¿cuadra?</div>
+          <div style="background:var(--field);border-radius:7px;padding:8px 12px;font-size:12px;"><strong>⚠ Sin comprobar</strong> — Solo los gastos que necesitan atención</div>
+          <div style="background:var(--field);border-radius:7px;padding:8px 12px;font-size:12px;"><strong>📈 Fijos vs variables</strong> — Estructura de costos del mes</div>
+        </div>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">4</div>
+      <div class="paso-body">
+        <h4>Alerta de corte 6pm</h4>
+        <p>A partir de las 5pm aparece automáticamente un banner amarillo recordando verificar que todas las sucursales hayan capturado sus movimientos del día.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 7: GASTOS FIJOS -->
+<div class="seccion" id="s7">
+  <div class="sec-header">
+    <div class="sec-num">7</div>
+    <div><div class="sec-title">Gastos fijos mensuales</div><div class="sec-sub">Catálogo de pagos recurrentes — Claudia, Lilian, Erick</div></div>
+  </div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>¿Para qué sirve esta pantalla?</h4>
+        <p>Aquí se registran todos los pagos fijos del mes: rentas de vehículos (UNIRENTA), rentas de inmuebles, créditos bancarios, IMSS, telecomunicaciones, proveedores recurrentes. <strong>No se capturan en la planilla de gastos diarios</strong> — van solo aquí.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Marcar un gasto fijo como pagado</h4>
+        <p>Cuando se realice el pago de un concepto fijo, toca el botón de estado para cambiarlo de <span style="background:var(--warn-bg);color:var(--warn);padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;">Pendiente</span> a <span style="background:var(--ok-bg);color:var(--ok);padding:2px 8px;border-radius:8px;font-size:11px;font-weight:700;">Pagado</span>.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>Agregar un concepto fijo nuevo</h4>
+        <p>Usa el formulario en la parte de abajo para agregar pagos recurrentes que no estén en el catálogo. Se guardan para todos los meses siguientes.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 8: ADMIN USUARIOS -->
+<div class="seccion" id="s8">
+  <div class="sec-header">
+    <div class="sec-num">8</div>
+    <div><div class="sec-title">Administración de usuarios</div><div class="sec-sub">Solo Erick y Lilian — gestión de accesos</div></div>
+  </div>
+
+  <div class="callout warn"><strong>⚠ Acceso muy restringido</strong>Este panel solo lo pueden abrir Erick y Lilian. Desde aquí se controlan todos los accesos al sistema.</div>
+
+  <div class="pasos">
+    <div class="paso">
+      <div class="paso-num">1</div>
+      <div class="paso-body">
+        <h4>Cambiar contraseña de un usuario</h4>
+        <p>En la tabla de usuarios, toca el ícono 🔑 de la persona. Escribe la nueva contraseña dos veces y guarda. El cambio aplica de inmediato — la próxima vez que esa persona abra la app tiene que entrar con la clave nueva.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">2</div>
+      <div class="paso-body">
+        <h4>Dar de alta un usuario nuevo</h4>
+        <p>Toca el botón <strong>"+ Nuevo usuario"</strong>, llena el formulario con nombre de usuario, sucursal, rol y contraseña. El usuario queda activo de inmediato.</p>
+      </div>
+    </div>
+    <div class="paso">
+      <div class="paso-num">3</div>
+      <div class="paso-body">
+        <h4>Desactivar un usuario</h4>
+        <p>Toca el ícono 🔴 en la fila del usuario. Su acceso queda bloqueado inmediatamente — si intenta entrar, el sistema le dice que sus credenciales no son válidas. Los registros que hizo no se borran.</p>
+        <div class="tip">✓ Para reactivarlo, toca el ícono 🟢 en la misma fila.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SECCIÓN 9: PREGUNTAS FRECUENTES -->
+<div class="seccion" id="s9">
+  <div class="sec-header">
+    <div class="sec-num">9</div>
+    <div><div class="sec-title">Preguntas frecuentes</div><div class="sec-sub">Problemas comunes y cómo resolverlos</div></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;">
+
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">❓ No me deja guardar el movimiento</div>
+      <p style="font-size:13px;color:var(--muted);">El sistema valida que llenes todos los campos obligatorios. Revisa que tengas: monto mayor a cero, concepto escrito, y si el monto es mayor a $10,000, que hayas seleccionado quién autoriza.</p>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">❓ Se me fue internet cuando estaba capturando</div>
+      <p style="font-size:13px;color:var(--muted);">No te preocupes. El sistema guarda el gasto localmente en tu celular y lo sube automáticamente cuando regrese la señal. Verás un banner naranja que dice "Sin internet" mientras no tengas conexión.</p>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">❓ Me equivoqué en el monto o el concepto</div>
+      <p style="font-size:13px;color:var(--muted);">Ve a "Mis gastos", busca el movimiento y toca el ícono de lápiz ✎. Corrígelo y guarda. Si ya lo cerró el sistema o necesitas editar un registro de otra persona, avísale a Lilian o Erick.</p>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">❓ El sistema me pide contraseña aunque ya había entrado</div>
+      <p style="font-size:13px;color:var(--muted);">La sesión se guarda mientras el navegador esté abierto. Si cerraste el navegador o abriste en modo incógnito, tienes que entrar de nuevo con tu usuario y contraseña.</p>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">❓ ¿Puedo capturar desde el celular?</div>
+      <p style="font-size:13px;color:var(--muted);">Sí. El sistema está optimizado para celular. Puedes tomar fotos de los comprobantes directamente con la cámara sin necesidad de salir de la app.</p>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">❓ ¿La gasolina se captura aquí?</div>
+      <p style="font-size:13px;color:var(--muted);">No. La gasolina viene de Efectivale y no se captura en este sistema. El botón de gasolina está bloqueado con un candado 🔒.</p>
+    </div>
+
+    <div style="background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:6px;">❓ ¿Olvidé mi contraseña?</div>
+      <p style="font-size:13px;color:var(--muted);">Contacta a Erick o Lilian para que te la cambien desde el panel de administración de usuarios. No hay recuperación de contraseña por correo.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- PIE -->
+<div style="text-align:center;padding:32px 0 20px;border-top:2px solid var(--line);margin-top:40px;">
+  <div style="font-size:28px;margin-bottom:8px;">🏪</div>
+  <div style="font-size:13px;font-weight:700;color:var(--ink);">Ferregama · Sistema de Control de Gastos</div>
+  <div style="font-size:11px;color:var(--muted);margin-top:4px;">Versión 9 · Julio 2026 · Desarrollado por Erick Cisneros</div>
+  <div style="margin-top:12px;font-size:11px;color:var(--muted);">Soporte técnico: contactar a Erick directamente</div>
+</div>
+
+</div>
+</body>
+</html>
