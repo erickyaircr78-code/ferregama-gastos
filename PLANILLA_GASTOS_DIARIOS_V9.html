@@ -599,6 +599,7 @@ function iniciarSesion(){
       tipoSel='Vehículos: gasolina';
       $('bonifExtra').style.display='none';
       $('efectExtra').style.display='block';
+      $('submitBtn').style.display='none';
       actualizarCausa();
       actualizarConceptosPorTipo(tipoSel);
     });
@@ -663,6 +664,7 @@ document.querySelectorAll('.tipo-btn:not(.bloqueado)').forEach(b=>b.addEventList
   tipoSel=b.dataset.t;
   $('bonifExtra').style.display=tipoSel==='Bonificación a cliente'?'block':'none';
   $('efectExtra').style.display=tipoSel==='Vehículos: gasolina'?'block':'none';
+  $('submitBtn').style.display=tipoSel==='Vehículos: gasolina'?'none':'block';
   actualizarCausa();
   actualizarConceptosPorTipo(tipoSel);
   actualizarCausa();
