@@ -306,7 +306,7 @@ tr:hover td{background:#faf8f3;}
   <div class="cat-grid">
     <div class="cat"><div class="lbl">Veh: mantto</div><div class="val" style="color:#5a7d99;" id="cMantto">$0</div></div>
     <div class="cat"><div class="lbl">Viáticos</div><div class="val" style="color:#c8a020;" id="cViat">$0</div></div>
-    <div class="cat"><div class="lbl">Nómina</div><div class="val" style="color:#2e7d45;" id="cNom">$0</div></div>
+    <div class="cat"><div class="lbl">Caja chica nómina</div><div class="val" style="color:#2e7d45;" id="cNom">$0</div></div>
     <div class="cat"><div class="lbl">Préstamos</div><div class="val" style="color:#b5482a;" id="cPrest">$0</div></div>
     <div class="cat"><div class="lbl">Otros (suma)</div><div class="val" style="color:var(--muted);" id="cOtros">$0</div></div>
   </div>
@@ -506,7 +506,13 @@ function renderTodo(){
 
   // categorías
   const tots={mantto:0,viat:0,nom:0,prest:0,otros:0};
-  gastos.forEach(m=>{if(m.tipo==='Vehículos: mantenimiento')tots.mantto+=m.monto;else if(m.tipo==='Viáticos/Foráneas')tots.viat+=m.monto;else if(m.tipo==='Nómina/Sueldos')tots.nom+=m.monto;else if(m.tipo==='Préstamo/Faltante a personal')tots.prest+=m.monto;else tots.otros+=m.monto;});
+  gastos.forEach(m=>{
+    if(m.tipo==='Vehículos: mantenimiento')tots.mantto+=m.monto;
+    else if(m.tipo==='Viáticos/Foráneas')tots.viat+=m.monto;
+    else if(m.concepto==='Préstamo caja chica para nómina semanal')tots.nom+=m.monto;
+    else if(m.tipo==='Préstamo/Faltante a personal')tots.prest+=m.monto;
+    else tots.otros+=m.monto;
+  });
   $('cMantto').textContent=fmt(tots.mantto);$('cViat').textContent=fmt(tots.viat);$('cNom').textContent=fmt(tots.nom);$('cPrest').textContent=fmt(tots.prest);$('cOtros').textContent=fmt(tots.otros);
 
   // alertas
@@ -523,13 +529,19 @@ function renderTodo(){
   $('sucGrid').innerHTML=['CDMX','Morelos','Puebla'].map(suc=>{
     const ms=gastos.filter(m=>m.sucursal===suc);
     const tt={mantto:0,viat:0,nom:0,prest:0,otros:0};
-    ms.forEach(m=>{if(m.tipo==='Vehículos: mantenimiento')tt.mantto+=m.monto;else if(m.tipo==='Viáticos/Foráneas')tt.viat+=m.monto;else if(m.tipo==='Nómina/Sueldos')tt.nom+=m.monto;else if(m.tipo==='Préstamo/Faltante a personal')tt.prest+=m.monto;else tt.otros+=m.monto;});
+    ms.forEach(m=>{
+      if(m.tipo==='Vehículos: mantenimiento')tt.mantto+=m.monto;
+      else if(m.tipo==='Viáticos/Foráneas')tt.viat+=m.monto;
+      else if(m.concepto==='Préstamo caja chica para nómina semanal')tt.nom+=m.monto;
+      else if(m.tipo==='Préstamo/Faltante a personal')tt.prest+=m.monto;
+      else tt.otros+=m.monto;
+    });
     const tot=Object.values(tt).reduce((a,b)=>a+b,0);
     const hoyMov=f.filter(m=>m.sucursal===suc&&m.fecha===hoyISO()).length;
     return `<div class="suc-card"><h3>${suc} <small style="font-size:10px;color:var(--muted);font-weight:400;">${hoyMov} mov. hoy</small></h3>
       <div class="suc-row"><span>Veh: mantto</span><span>${fmt(tt.mantto)}</span></div>
       <div class="suc-row"><span>Viáticos</span><span>${fmt(tt.viat)}</span></div>
-      <div class="suc-row"><span>Nómina</span><span>${fmt(tt.nom)}</span></div>
+      <div class="suc-row"><span>Caja chica nómina</span><span>${fmt(tt.nom)}</span></div>
       <div class="suc-row"><span>Préstamos</span><span>${fmt(tt.prest)}</span></div>
       <div class="suc-row"><span>Otros</span><span>${fmt(tt.otros)}</span></div>
       <div class="suc-row"><span>Total gasto</span><span>${fmt(tot)}</span></div>
