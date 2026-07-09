@@ -477,7 +477,7 @@ function suscribir(){
 /* RENDER PRINCIPAL */
 function renderTodo(){
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const total=gastos.reduce((a,m)=>a+m.monto,0);
   const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
@@ -607,7 +607,7 @@ function renderDetalle(base){
 }
 
 function actualizarChips(f){
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
   const sinComp=gastos.filter(m=>!m.comprobante&&!m.causaRaiz).length;
   const autors=gastos.filter(m=>m.autorizado).length;
   const chips=[];
@@ -622,7 +622,7 @@ let historial=[];
 
 function analizarDatos(){
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const hoyStr=hoyISO();
   const total=gastos.reduce((a,m)=>a+m.monto,0);
@@ -671,7 +671,7 @@ function analizarDatos(){
 function responderPregunta(pregunta){
   const p=pregunta.toLowerCase();
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const hoyStr=hoyISO();
   if(p.includes('sucursal')&&(p.includes('más')||p.includes('mayor')||p.includes('mas'))){
@@ -774,7 +774,7 @@ function filaTotal(datos,cols){
 
 function generarReporte(tipo){
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente');
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const wb=XLSX.utils.book_new();
   const hoy2=hoyISO();
