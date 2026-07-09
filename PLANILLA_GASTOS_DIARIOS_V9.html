@@ -83,6 +83,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--paper);color:v
 .tipo-btn.active{color:#fff;border-color:transparent;animation:pop .2s ease;}
 .tipo-btn.bloqueado{opacity:.5;cursor:not-allowed;background:#f5f0e8;}
 .tipo-btn.bloqueado::after{content:'🔒 Efectivale';position:absolute;inset:0;border-radius:8px;background:rgba(255,255,255,.88);display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--danger);font-weight:700;}
+.tipo-btn.efectivale-activo{background:linear-gradient(135deg,#2e7d45,#1a4828);color:#fff;border-color:transparent;}
+.tipo-btn.efectivale-activo::after{display:none;}
+.efect-extra{background:var(--ok-bg);border:1.5px solid var(--ok-br);border-radius:9px;padding:12px;margin-bottom:13px;display:none;}
+.efect-extra .ct{color:var(--ok);}
 .tipo-btn[data-t="Bonificación a cliente"].active{background:linear-gradient(135deg,var(--t-bonif),var(--t-bonif-dk));}
 .tipo-btn[data-t="Bono/Extra a personal"].active{background:linear-gradient(135deg,var(--t-bono),var(--t-bono-dk));}
 .tipo-btn[data-t="Nómina/Sueldos"].active{background:linear-gradient(135deg,var(--t-nom),var(--t-nom-dk));}
@@ -288,9 +292,8 @@ tr:hover td{background:#faf8f3;}
           <div class="tipos-grid" id="tiposGrid">
             <button class="tipo-btn bonif-span" data-t="Bonificación a cliente"><span class="ico">📋</span>Bonificación<br>a cliente<span class="tip-dot" id="dot-Bonificación a cliente"></span></button>
             <button class="tipo-btn active" data-t="Bono/Extra a personal"><span class="ico">💰</span>Bono/Extra<br>personal<span class="tip-dot" id="dot-Bono/Extra a personal"></span></button>
-            <button class="tipo-btn" data-t="Nómina/Sueldos"><span class="ico">💳</span>Nómina/<br>Sueldos<span class="tip-dot" id="dot-Nómina/Sueldos"></span></button>
             <button class="tipo-btn" data-t="Vehículos: mantenimiento"><span class="ico">🔧</span>Vehículos:<br>mantto<span class="tip-dot" id="dot-Vehículos: mantenimiento"></span></button>
-            <button class="tipo-btn bloqueado" data-t="Vehículos: gasolina"><span class="ico">⛽</span>Gasolina</button>
+            <button class="tipo-btn bloqueado" data-t="Vehículos: gasolina" id="btnEfectivale"><span class="ico">⛽</span>Efectivale</button>
             <button class="tipo-btn" data-t="Vehículos: casetas/estac/talacha"><span class="ico">🛣️</span>Casetas/<br>estac<span class="tip-dot" id="dot-Vehículos: casetas/estac/talacha"></span></button>
             <button class="tipo-btn" data-t="Viáticos/Foráneas"><span class="ico">✈️</span>Viáticos/<br>Foráneas<span class="tip-dot" id="dot-Viáticos/Foráneas"></span></button>
             <button class="tipo-btn" data-t="Custodia/Seguridad"><span class="ico">🛡️</span>Custodia/<br>Seguridad<span class="tip-dot" id="dot-Custodia/Seguridad"></span></button>
@@ -332,6 +335,29 @@ tr:hover td{background:#faf8f3;}
               <label>Foto del listado de facturas (opcional)</label>
               <div class="comp-z" id="bonifFotoZ" style="padding:11px;">📷 Tomar foto o adjuntar imagen del listado<input type="file" id="bonifFotoInput" accept="image/*,application/pdf" style="display:none;" capture="environment"></div>
               <div id="bonifFotoPrev" style="display:none;margin-top:6px;"><img id="bonifFotoImg" src="" style="max-height:80px;border-radius:7px;border:1px solid var(--line);"><button type="button" class="ibtn" id="quitarBonifFoto" style="margin-left:6px;">✕ Quitar foto</button></div>
+            </div>
+          </div>
+
+          <!-- CAMPOS EFECTIVALE -->
+          <div class="efect-extra" id="efectExtra">
+            <p class="ct">Recarga Efectivale — datos</p>
+            <div class="bonif-extra-grid">
+              <div class="fg"><label>Sucursal que recibe *</label>
+                <select id="efectSucursal">
+                  <option value="">Selecciona sucursal</option>
+                  <option value="CDMX">CDMX</option>
+                  <option value="Morelos">Morelos</option>
+                  <option value="Puebla">Puebla</option>
+                </select>
+              </div>
+              <div class="fg"><label>Monto recargado *</label>
+                <div class="aw"><span class="sym">$</span><input type="number" id="efectMonto" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+              </div>
+            </div>
+            <div class="fg" style="margin-bottom:0;">
+              <label>Comprobante del portal Efectivale</label>
+              <div class="comp-z" id="efectCompZ" style="padding:11px;">📎 Subir captura de pantalla o PDF del portal<input type="file" id="efectCompInput" accept="image/*,application/pdf" style="display:none;" capture="environment"></div>
+              <div id="efectCompPrev" style="display:none;margin-top:6px;"><img id="efectCompImg" src="" style="max-height:80px;border-radius:7px;border:1px solid var(--line);"><button type="button" class="ibtn" id="quitarEfectComp">✕ Quitar</button></div>
             </div>
           </div>
 
@@ -556,6 +582,23 @@ function iniciarSesion(){
   if(sesion.rol!=='admin'){$('reinicioBtn').style.display='none';}
   $('capturista').value=sesion.user;
   actualizarConceptosPorTipo(tipoSel);
+  // activar Efectivale solo para claudia
+  if(sesion.user==='claudia'){
+    const btnEfect=$('btnEfectivale');
+    btnEfect.classList.remove('bloqueado');
+    btnEfect.classList.add('efectivale-activo');
+    btnEfect.style.opacity='1';
+    btnEfect.style.cursor='pointer';
+    btnEfect.addEventListener('click',()=>{
+      document.querySelectorAll('.tipo-btn').forEach(x=>x.classList.remove('active'));
+      btnEfect.classList.add('active');
+      tipoSel='Vehículos: gasolina';
+      $('bonifExtra').style.display='none';
+      $('efectExtra').style.display='block';
+      actualizarCausa();
+      actualizarConceptosPorTipo(tipoSel);
+    });
+  }
   // mostrar formato de folios según sucursal
   const formatosFolios={
     'CDMX':'Formatos válidos CDMX: <strong>AG</strong>, <strong>AGM</strong>, <strong>AGR</strong>, <strong>FVB</strong>, <strong>MVB</strong>, <strong>RB</strong> + número. Ej: AG46404, FVB1023',
@@ -593,7 +636,7 @@ const CONCEPTOS_TIPO={
   'Oficina/Papelería/Bodega':{placeholder:'Ej. Papelería, rollos térmicos, propina truper...',opts:['Papelería','Rollos térmicos','Tóner','Material bodega','Bolsas','Sellos','Propina truper','Garrafones agua','Productos limpieza']},
   'Servicios (luz/agua/internet)':{placeholder:'Ej. Luz, agua, internet, teléfono...',opts:['Luz','Agua','Internet','Teléfono','Dominio','Página web','Reconexión']},
   'Local: limpieza/mantto':{placeholder:'Ej. Limpieza oficina, basura, electricista...',opts:['Limpieza oficina','Basura/escombro','Electricista','Impermeabilización','Vidrios','Cascajo']},
-  'Préstamo/Faltante a personal':{placeholder:'Ej. Préstamo empleado, faltante caja...',opts:['Préstamo empleado','Faltante caja','Vale']},
+  'Préstamo/Faltante a personal':{placeholder:'Ej. Préstamo empleado, faltante caja, nómina semanal...',opts:['Préstamo empleado','Faltante caja','Vale','Préstamo caja chica para nómina semanal']},
   'Dirección/Socios':{placeholder:'Ej. Pago TC, pago Amex, retiro socios...',opts:['Pago TC','Pago Amex','Seguro Alexandra','Retiro socios','IMSS Garman','Gasolina Jr']},
   'Salud/Farmacia':{placeholder:'Ej. Farmacia, medicamentos...',opts:['Farmacia','Medicamentos']},
   'Otros/Revisar':{placeholder:'Describe el gasto...',opts:['Otro']}
@@ -615,6 +658,7 @@ document.querySelectorAll('.tipo-btn:not(.bloqueado)').forEach(b=>b.addEventList
   b.classList.add('active');
   tipoSel=b.dataset.t;
   $('bonifExtra').style.display=tipoSel==='Bonificación a cliente'?'block':'none';
+  $('efectExtra').style.display=tipoSel==='Vehículos: gasolina'?'block':'none';
   actualizarCausa();
   actualizarConceptosPorTipo(tipoSel);
   actualizarCausa();
@@ -733,6 +777,16 @@ $('bonifFolios').addEventListener('input',()=>{
   }
 });
 
+/* COMPROBANTE EFECTIVALE */
+let efectComp=null;
+$('efectCompZ').addEventListener('click',()=>$('efectCompInput').click());
+$('efectCompInput').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  if(file.type.startsWith('image/')){comprimirImg(file,d=>{efectComp={tipo:'imagen',data:d,nombre:file.name};$('efectCompImg').src=d;$('efectCompImg').style.display='block';$('efectCompPrev').style.display='block';$('efectCompZ').childNodes[0].textContent='✅ Comprobante listo';});}
+  else if(file.type==='application/pdf'){const r=new FileReader();r.onload=ev=>{efectComp={tipo:'pdf',data:ev.target.result,nombre:file.name};$('efectCompPrev').style.display='block';$('efectCompZ').childNodes[0].textContent='✅ PDF adjunto';};r.readAsDataURL(file);}
+});
+$('quitarEfectComp').addEventListener('click',()=>{efectComp=null;$('efectCompInput').value='';$('efectCompPrev').style.display='none';$('efectCompImg').src='';$('efectCompZ').childNodes[0].textContent='📎 Subir captura de pantalla o PDF del portal';});
+
 /* COMPROBANTE */
 let comp=null,compEd=null;
 function comprimirImg(file,cb){const r=new FileReader();r.onload=e=>{const img=new Image();img.onload=()=>{const M=1000;let w=img.width,h=img.height;if(w>M||h>M){if(w>h){h=Math.round(h*M/w);w=M;}else{w=Math.round(w*M/h);h=M;}}const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);cb(c.toDataURL('image/jpeg',.6));};img.src=e.target.result;};r.readAsDataURL(file);}
@@ -785,6 +839,26 @@ $('submitBtn').addEventListener('click',async()=>{
   const autorizado=$('autorizado').value.trim();
   const causaRaiz=$('causaRaiz').value;
   const msg=$('statusMsg'),btn=$('submitBtn');
+
+  // ── VALIDACIONES EFECTIVALE ──
+  if(tipoSel==='Vehículos: gasolina'){
+    const efectSuc=$('efectSucursal').value;
+    const efectMto=parseFloat($('efectMonto').value);
+    if(!efectSuc){msg.textContent='Selecciona la sucursal que recibe la recarga.';msg.className='status-msg err';$('efectSucursal').focus();return;}
+    if(!efectMto||efectMto<=0){msg.textContent='El monto de la recarga es obligatorio.';msg.className='status-msg err';$('efectMonto').focus();return;}
+    const movEfect={fecha:hoyISO(),tipo:'Vehículos: gasolina',esEfectivale:true,sucursal:efectSuc,persona:'Efectivale',concepto:'Recarga Efectivale',monto:efectMto,capturista:sesion.user,autorizado:'',causaRaiz:'',comprobante:efectComp||null,esBonificacion:false};
+    btn.disabled=true;btn.textContent='Guardando...';
+    try{
+      await db.collection('movimientos').add({...movEfect,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+      toast(`Efectivale registrado: ${efectSuc} · ${fmt(efectMto)}`);
+      msg.textContent='Recarga Efectivale guardada.';msg.className='status-msg ok';
+      $('efectSucursal').value='';$('efectMonto').value='';
+      efectComp=null;$('efectCompInput').value='';$('efectCompPrev').style.display='none';
+      $('efectCompImg').src='';$('efectCompZ').childNodes[0].textContent='📎 Subir captura de pantalla o PDF del portal';
+    }catch(e){msg.textContent='Error al guardar. Verifica tu conexión.';msg.className='status-msg err';}
+    finally{btn.disabled=false;btn.textContent='Registrar movimiento';}
+    return;
+  }
 
   // ── VALIDACIONES BONIFICACIÓN A CLIENTE ──
   if(tipoSel==='Bonificación a cliente'){
