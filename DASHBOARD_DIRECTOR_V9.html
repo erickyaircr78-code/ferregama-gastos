@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard Director v9 · Firebase — Ferregama</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<style>
+:root{
+  --ink:#141c18;--paper:#f4f2eb;--card:#fff;--line:#e2ddd4;
+  --accent:#b5482a;--accent2:#8c3620;
+  --ok:#2e7d45;--ok-bg:#e6f4eb;
+  --warn:#c07a00;--warn-bg:#fff3d6;
+  --danger:#c0392b;--danger-bg:#fdecea;
+  --muted:#8a857a;--field:#f0ede4;
+  --radius:12px;--shadow:0 4px 20px rgba(0,0,0,.07);--shadow-lg:0 12px 40px rgba(0,0,0,.13);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes pop{from{opacity:0;transform:scale(.93)}to{opacity:1;transform:scale(1)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--paper);color:var(--ink);}
+
+.topbar{background:linear-gradient(135deg,#141c18,#1e3028);color:#fff;padding:14px 26px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:20;box-shadow:0 2px 20px rgba(0,0,0,.25);}
+.topbar-l .ey{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#9eb8a8;font-weight:600;}
+.topbar-l h1{font-size:18px;font-weight:800;}
+.topbar-r{display:flex;align-items:center;gap:10px;}
+.vbadge{font-size:10px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18);color:#9eb8a8;padding:3px 9px;border-radius:20px;font-weight:700;}
+.ubadge{font-size:10px;background:rgba(181,72,42,.25);border:1px solid rgba(181,72,42,.4);color:#f0b8a0;padding:3px 9px;border-radius:20px;font-weight:700;}
+.fecha-txt{color:#9eb8a8;font-size:12.5px;}
+
+.wrap{max-width:1340px;margin:0 auto;padding:20px 26px 60px;}
+
+.file-alert{background:var(--danger-bg);border:1.5px solid #e57373;color:#7f1010;border-radius:var(--radius);padding:12px 16px;margin-bottom:14px;display:none;font-size:12.5px;line-height:1.5;}
+.file-alert strong{display:block;margin-bottom:3px;}
+.file-alert code{background:#fff;padding:1px 6px;border-radius:4px;font-size:11.5px;}
+
+/* LOGIN */
+.login-ov{position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#1e3028,#141c18);display:flex;align-items:center;justify-content:center;z-index:300;}
+.login-box{background:var(--card);border-radius:16px;padding:30px 26px;max-width:340px;width:90%;box-shadow:0 30px 60px rgba(0,0,0,.4);animation:pop .4s cubic-bezier(.34,1.56,.64,1);}
+.login-box .logo{text-align:center;font-size:26px;margin-bottom:6px;}
+.login-box h2{font-size:17px;font-weight:800;text-align:center;margin-bottom:3px;}
+.login-box p{font-size:12px;color:var(--muted);text-align:center;margin-bottom:18px;}
+.login-err{background:var(--danger-bg);color:var(--danger);border:1px solid #e57373;border-radius:7px;padding:7px 10px;font-size:12px;font-weight:600;margin-bottom:11px;display:none;}
+.fg{margin-bottom:12px;}
+label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:4px;}
+input,select,textarea{width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;background:var(--field);font-size:14px;color:var(--ink);font-family:inherit;transition:all .2s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(181,72,42,.1);}
+.btn-submit{width:100%;padding:12px;border:none;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 14px rgba(181,72,42,.3);transition:all .2s;}
+.btn-submit:hover{transform:translateY(-1px);}
+.btn-sec{padding:8px 14px;background:transparent;border:1.5px solid var(--line);color:var(--ink);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;}
+.btn-sec:hover{background:var(--field);}
+
+/* FILTROS */
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:18px;}
+.filters select,.filters input{width:auto;padding:8px 11px;font-size:12.5px;}
+
+/* HERO */
+.hero-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:16px;}
+@media(max-width:800px){.hero-grid{grid-template-columns:repeat(2,1fr);}}
+.hero{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s;animation:up .35s ease;}
+.hero:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
+.hero .lbl{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:5px;}
+.hero .val{font-size:22px;font-weight:900;letter-spacing:-.02em;}
+.hero .sub{font-size:11px;color:var(--muted);margin-top:3px;}
+.hero.t .val{color:var(--accent2);}
+.hero.b .val{color:var(--danger);}
+.hero.w .val{color:var(--warn);}
+.hero.a .val{color:var(--danger);}
+
+/* CATS */
+.cat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:16px;}
+@media(max-width:700px){.cat-grid{grid-template-columns:repeat(3,1fr);}}
+.cat{background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 12px;box-shadow:var(--shadow);animation:up .35s ease;}
+.cat .lbl{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:3px;}
+.cat .val{font-size:15px;font-weight:900;}
+
+/* AGENTE */
+.agente{background:linear-gradient(135deg,#141c18,#1e3028);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px;border:1px solid #2e5040;animation:up .4s ease;}
+.agente-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+.agente-ic{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+.agente-title{font-size:13px;font-weight:700;color:#fff;}
+.agente-sub{font-size:10.5px;color:#9eb8a8;}
+.agente-body{background:rgba(255,255,255,.05);border-radius:9px;padding:14px 16px;font-size:12.5px;color:#e8f0ec;line-height:1.7;margin-bottom:12px;min-height:80px;}
+.agente-body.loading{display:flex;align-items:center;gap:10px;color:#9eb8a8;}
+.spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.2);border-top-color:#9eb8a8;border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;}
+.agente-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.chip{padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;}
+.chip-r{background:rgba(192,57,43,.3);color:#f0a0a0;}
+.chip-w{background:rgba(192,120,0,.3);color:#f0d080;}
+.chip-g{background:rgba(46,125,69,.3);color:#80d0a0;}
+.agente-qa{display:flex;gap:7px;margin-bottom:8px;}
+.agente-qa textarea{flex:1;font-size:12.5px;padding:9px 12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;color:#fff;resize:none;min-height:40px;max-height:100px;}
+.agente-qa textarea::placeholder{color:#5a8070;}
+.agente-qa textarea:focus{outline:none;border-color:rgba(181,72,42,.6);background:rgba(255,255,255,.1);}
+.agente-btn{padding:9px 14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;align-self:flex-end;}
+.agente-btn:hover{transform:translateY(-1px);}
+.agente-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
+.agente-sugs{font-size:10px;color:#4a7060;}
+.agente-historial{margin-top:10px;max-height:260px;overflow-y:auto;}
+.msg-user{background:rgba(255,255,255,.08);border-radius:8px;padding:8px 12px;font-size:12px;color:#c8e0d0;margin-bottom:8px;border-left:3px solid rgba(181,72,42,.6);}
+.msg-agent{background:rgba(255,255,255,.04);border-radius:8px;padding:8px 12px;font-size:12px;color:#e8f0ec;margin-bottom:8px;line-height:1.65;border-left:3px solid rgba(46,125,69,.5);}
+.msg-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5a8070;margin-bottom:3px;}
+
+/* ALERTAS */
+.alerts-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+@media(max-width:700px){.alerts-grid{grid-template-columns:1fr;}}
+.alert-card{border-radius:var(--radius);padding:14px 16px;animation:up .4s ease;}
+.alert-card.danger{background:var(--danger-bg);border:1.5px solid #e57373;}
+.alert-card.warn{background:var(--warn-bg);border:1.5px solid #f0c040;}
+.alert-card h4{font-size:12.5px;font-weight:800;margin-bottom:8px;}
+.alert-card.danger h4{color:var(--danger);}
+.alert-card.warn h4{color:var(--warn);}
+.alert-item{font-size:12px;padding:5px 0;border-bottom:1px solid rgba(0,0,0,.07);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.alert-item:last-child{border:none;}
+.alert-empty{font-size:12px;color:var(--muted);}
+
+/* SUCURSALES */
+.suc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+@media(max-width:700px){.suc-grid{grid-template-columns:1fr;}}
+.suc-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow);animation:up .4s ease;}
+.suc-card h3{font-size:14px;font-weight:800;margin-bottom:10px;}
+.suc-row{display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line);}
+.suc-row:last-child{border:none;font-weight:800;font-size:13.5px;padding-top:7px;}
+
+/* CARD */
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow);}
+.ct{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--accent2);margin-bottom:12px;}
+.table-wrap{overflow-x:auto;max-height:420px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{text-align:left;padding:8px 7px;background:var(--field);color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--line);position:sticky;top:0;z-index:1;}
+td{padding:8px 7px;border-bottom:1px solid var(--line);}
+tr:hover td{background:#faf8f3;}
+.ac{font-weight:800;text-align:right;}
+.erow td{text-align:center;color:var(--muted);padding:24px;}
+
+/* BADGE */
+.badge{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;display:inline-block;}
+.b-bonif{background:#d94f3a;color:#fff;}
+.b-bono{background:#e0823a;color:#fff;}
+.b-nom{background:#2e7d45;color:#fff;}
+.b-mantto{background:#5a7d99;color:#fff;}
+.b-cas{background:#6b8c6b;color:#fff;}
+.b-viat{background:#c8a020;color:#5a4500;}
+.b-cust{background:#4a4a4a;color:#fff;}
+.b-of{background:#8b6914;color:#fff;}
+.b-serv{background:#2e6090;color:#fff;}
+.b-limp{background:#5a7a5a;color:#fff;}
+.b-prest{background:#b5482a;color:#fff;}
+.b-dir{background:#7558a6;color:#fff;}
+.b-sal{background:#b54878;color:#fff;}
+.b-ot{background:#8a857a;color:#fff;}
+
+/* ESTADO FIJOS */
+.ep{padding:3px 9px;border-radius:10px;font-size:11px;font-weight:700;}
+.ep.pagado{background:var(--ok-bg);color:var(--ok);}
+
+.export-opt{display:block;width:100%;padding:10px 14px;text-align:left;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;transition:background .15s;font-family:inherit;}
+.export-opt:hover{background:var(--field);}
+.export-opt:not(:last-child){border-bottom:1px solid var(--line);}
+
+.ep.pendiente{background:var(--warn-bg);color:var(--warn);}
+
+/* BONIF BLOQUE */
+.bonif-block{background:var(--danger-bg);border:1px solid #e57373;border-radius:var(--radius);padding:15px 17px;margin-bottom:14px;}
+.bonif-block .ct{color:var(--danger);}
+
+/* CHARTS */
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:14px;margin-bottom:16px;}
+@media(max-width:900px){.grid2{grid-template-columns:1fr;}}
+.chart-wrap{height:210px;position:relative;}
+
+.corte-banner{background:linear-gradient(135deg,#fff8e6,#fff3d6);border:1.5px solid #f0c040;border-radius:9px;padding:11px 15px;margin-bottom:14px;display:none;font-size:12.5px;color:var(--warn);font-weight:600;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-ov" id="loginOv">
+  <div class="login-box">
+    <div class="logo">📊</div>
+    <h2>Dashboard Ferregama</h2>
+    <p>Solo admins y dirección</p>
+    <div class="login-err" id="loginErr">Acceso no permitido</div>
+    <div class="fg"><label>Usuario</label><input type="text" id="loginUser" placeholder="Tu usuario" autocomplete="username" autocapitalize="none"></div>
+    <div class="fg"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn-submit" id="loginBtn">Entrar al dashboard</button>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-l">
+    <div class="ey">Ferregama · Control de gastos</div>
+    <h1>Dashboard del director</h1>
+  </div>
+  <div class="topbar-r">
+    <span class="vbadge">v9 · Firebase</span>
+    <span class="ubadge" id="userBadge"></span>
+    <span class="fecha-txt" id="fechaHoy"></span>
+    <button class="btn-sec" id="logoutBtn" style="font-size:11px;padding:6px 11px;display:none;">Salir</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="file-alert" id="fileAlert">
+    <strong>⚠ Abierto directamente — Firebase no conecta.</strong>
+    Entra por <code>https://erickyaircr78-code.github.io/ferregama-gastos/DASHBOARD_DIRECTOR_V9.html</code>
+  </div>
+
+  <!-- CORTE 6PM -->
+  <div class="corte-banner" id="corteBanner"></div>
+
+  <!-- FILTROS -->
+  <div class="filters">
+    <select id="fSuc"><option value="">Todas las sucursales</option><option>CDMX</option><option>Morelos</option><option>Puebla</option></select>
+    <input type="date" id="fDesde" title="Desde">
+    <input type="date" id="fHasta" title="Hasta">
+    <button class="btn-sec" id="hoyBtn">Solo hoy</button>
+    <button class="btn-sec" id="semBtn">Esta semana</button>
+    <button class="btn-sec" id="clearBtn">Quitar filtros</button>
+    <div style="position:relative;" id="exportWrap">
+      <button class="btn-sec" id="exportMenuBtn" style="background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;">
+        ⬇ Descargar reporte
+      </button>
+      <div id="exportMenu" style="display:none;position:absolute;right:0;top:calc(100% + 6px);background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-lg);min-width:260px;z-index:50;overflow:hidden;">
+        <div style="padding:8px 12px;font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border-bottom:1px solid var(--line);">Selecciona el reporte</div>
+        <button class="export-opt" data-rpt="concentrado">📊 Concentrado ejecutivo</button>
+        <button class="export-opt" data-rpt="sucursales">🏪 Por sucursal (3 hojas)</button>
+        <button class="export-opt" data-rpt="categorias">📂 Mensual por categoría</button>
+        <button class="export-opt" data-rpt="bonificaciones">📋 Bonificaciones y conciliación</button>
+        <button class="export-opt" data-rpt="sincomprobar">⚠ Gastos sin comprobar</button>
+        <button class="export-opt" data-rpt="fijosvsvar">📈 Fijos vs. variables</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA DE TOTALES CONSOLIDADOS -->
+  <div style="background:linear-gradient(135deg,#141c18,#1e3028);border-radius:12px;margin-bottom:14px;display:grid;grid-template-columns:repeat(5,1fr);overflow:hidden;border:1px solid #2e5040;">
+    <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Gasto operativo</div>
+      <div style="font-size:22px;font-weight:800;color:#fff;" id="totalOpBarra">$0</div>
+      <div style="font-size:11px;color:#9eb8a8;margin-top:3px;" id="totalOpMovBarra">0 movimientos</div>
+    </div>
+    <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Bonificaciones <span style="font-size:9px;background:rgba(255,255,255,.1);padding:1px 6px;border-radius:8px;font-weight:400;">no es gasto</span></div>
+      <div style="font-size:22px;font-weight:800;color:#f0a0a0;" id="totalBonifBarra">$0</div>
+      <div style="font-size:11px;color:#9eb8a8;margin-top:3px;" id="totalBonifMovBarra">0 registros</div>
+    </div>
+    <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);background:rgba(46,125,69,.15);">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#80d0a0;margin-bottom:5px;">Efectivale <span style="font-size:9px;background:rgba(46,125,69,.3);padding:1px 6px;border-radius:8px;font-weight:400;">gasolina</span></div>
+      <div style="font-size:22px;font-weight:800;color:#80d0a0;" id="totalEfectBarra">$0</div>
+      <div style="font-size:11px;color:#80d0a0;margin-top:3px;" id="totalEfectDetBarra">Sin recargas</div>
+    </div>
+    <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Gastos fijos del mes</div>
+      <div style="font-size:22px;font-weight:800;color:#fff;" id="totalFijosBarra">$0</div>
+      <div style="font-size:11px;color:#f0c040;margin-top:3px;" id="totalFijosPendBarra">$0 pendientes</div>
+    </div>
+    <div style="padding:14px 18px;background:rgba(181,72,42,.2);">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#f0b8a0;margin-bottom:5px;">Total egresos</div>
+      <div style="font-size:26px;font-weight:900;color:#fff;" id="totalEgresosBarra">$0</div>
+      <div style="font-size:11px;color:#f0b8a0;margin-top:3px;">op + bonif + efect + fijos</div>
+    </div>
+  </div>
+
+  <!-- AGENTE INTELIGENTE -->
+  <div class="agente" id="agentePanel">
+    <div class="agente-header">
+      <div class="agente-ic">✦</div>
+      <div>
+        <div class="agente-title">Agente de análisis — Ferregama Gastos</div>
+        <div class="agente-sub" id="agenteSub">Listo para analizar</div>
+      </div>
+      <button class="btn-sec" id="analizarBtn" style="margin-left:auto;font-size:11px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:#9eb8a8;">Analizar ahora</button>
+    </div>
+
+    <div class="agente-body loading" id="agenteBody">
+      <div>Cargando datos de Firebase...</div>
+    </div>
+
+    <div class="agente-chips" id="agenteChips"></div>
+
+    <div class="agente-qa">
+      <textarea id="pregunta" placeholder="Pregúntale al agente... ej. ¿Qué sucursal gastó más esta semana? ¿Hay gastos sin comprobar? ¿Cómo vamos vs el mes pasado?" rows="2"></textarea>
+      <button class="agente-btn" id="preguntarBtn">Preguntar ↗</button>
+    </div>
+    <div class="agente-sugs">Sugerencias: ¿qué falta por capturar hoy? · ¿cómo vamos vs el mes pasado? · ¿quién tiene más gastos sin comprobante? · ¿las bonificaciones cuadran con lo pactado?</div>
+
+    <div class="agente-historial" id="agenteHistorial"></div>
+  </div>
+
+  <!-- HERO -->
+  <div class="hero-grid">
+    <div class="hero t"><div class="lbl">Gasto diario en periodo</div><div class="val" id="hGasto">$0</div><div class="sub" id="hGastoSub">0 movimientos</div></div>
+    <div class="hero b"><div class="lbl">Bonificaciones (no gasto)</div><div class="val" id="hBonif">$0</div><div class="sub" id="hBonifSub">0 registros</div></div>
+    <div class="hero w"><div class="lbl">Fijos pendientes del mes</div><div class="val" id="hPend">$0</div><div class="sub" id="hPendSub">Mes actual</div></div>
+    <div class="hero a"><div class="lbl">Sin comprobante ni causa</div><div class="val" id="hSinComp">0</div><div class="sub">Requieren atención</div></div>
+  </div>
+
+  <!-- CATEGORÍAS -->
+  <div class="cat-grid">
+    <div class="cat"><div class="lbl">Veh: mantto</div><div class="val" style="color:#5a7d99;" id="cMantto">$0</div></div>
+    <div class="cat"><div class="lbl">Viáticos</div><div class="val" style="color:#c8a020;" id="cViat">$0</div></div>
+    <div class="cat"><div class="lbl">Caja chica nómina</div><div class="val" style="color:#2e7d45;" id="cNom">$0</div></div>
+    <div class="cat"><div class="lbl">Préstamos</div><div class="val" style="color:#b5482a;" id="cPrest">$0</div></div>
+    <div class="cat"><div class="lbl">Otros (suma)</div><div class="val" style="color:var(--muted);" id="cOtros">$0</div></div>
+  </div>
+
+  <!-- ALERTAS DIRECTOR -->
+  <div class="alerts-grid">
+    <div class="alert-card danger">
+      <h4>🚫 Sin comprobante y sin causa raíz</h4>
+      <div id="alertaSinComp"><div class="alert-empty">Sin alertas ✓</div></div>
+    </div>
+    <div class="alert-card warn">
+      <h4>⚡ Gastos que requirieron autorización</h4>
+      <div id="alertaAutor"><div class="alert-empty">Sin movimientos mayores ✓</div></div>
+    </div>
+  </div>
+
+  <!-- SUCURSALES -->
+  <div class="suc-grid" id="sucGrid"></div>
+
+  <!-- BONIFICACIONES SEPARADAS -->
+  <div class="bonif-block" id="bonifBlock" style="display:none;">
+    <p class="ct">Bonificaciones a clientes — conciliación (NO son gasto)</p>
+    <div class="table-wrap" style="max-height:200px;">
+      <table><thead><tr><th>Fecha</th><th>Sucursal</th><th>Cliente</th><th>Cuenta</th><th>Desc%</th><th style="text-align:right;">Monto</th><th>¿Cuadra?</th><th>Folios</th><th>Capturó</th></tr></thead>
+      <tbody id="bonifTbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- GRÁFICAS -->
+  <div class="grid2">
+    <div class="card"><p class="ct">Gasto por categoría (sin bonificaciones)</p><div class="chart-wrap"><canvas id="chartCat"></canvas></div></div>
+    <div class="card"><p class="ct">Gasto diario vs. gastos fijos del mes</p><div class="chart-wrap"><canvas id="chartComp"></canvas></div></div>
+  </div>
+
+  <!-- GASTOS FIJOS -->
+  <div class="card">
+    <p class="ct">Gastos fijos del mes — estado de pago</p>
+    <div class="table-wrap"><table><thead><tr><th>Concepto</th><th>Sucursal</th><th>Día</th><th style="text-align:right;">Monto</th><th>Estado</th></tr></thead><tbody id="tbFijos"></tbody></table></div>
+  </div>
+
+  <!-- DETALLE -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:13px;">
+      <p class="ct" style="margin:0;">Detalle de movimientos</p>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+        <select id="dTipo" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Todos los tipos</option>
+          <option>Bonificación a cliente</option><option>Bono/Extra a personal</option><option>Nómina/Sueldos</option>
+          <option>Vehículos: mantenimiento</option><option>Vehículos: casetas/estac/talacha</option>
+          <option>Viáticos/Foráneas</option><option>Custodia/Seguridad</option><option>Oficina/Papelería/Bodega</option>
+          <option>Servicios (luz/agua/internet)</option><option>Local: limpieza/mantto</option>
+          <option>Préstamo/Faltante a personal</option><option>Dirección/Socios</option>
+          <option>Salud/Farmacia</option><option>Otros/Revisar</option>
+        </select>
+        <select id="dSuc" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Todas las sucursales</option><option>CDMX</option><option>Morelos</option><option>Puebla</option></select>
+        <input type="date" id="dFecha" style="width:auto;font-size:12px;padding:7px 10px;">
+        <button class="btn-sec" id="dClear" style="font-size:11px;">Limpiar</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Sucursal</th><th>Persona</th><th>Concepto</th><th style="text-align:right;">Monto</th><th>Autoriza</th><th>Comp.</th><th>Capturó</th></tr></thead>
+      <tbody id="tbDetalle"></tbody></table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+if(window.location.protocol==='file:')document.getElementById('fileAlert').style.display='block';
+
+const FB={apiKey:"AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",authDomain:"ferregama-gastos.firebaseapp.com",projectId:"ferregama-gastos",storageBucket:"ferregama-gastos.firebasestorage.app",messagingSenderId:"561677307493",appId:"1:561677307493:web:adb5284746c1dac3e3408c"};
+firebase.initializeApp(FB);
+const db=firebase.firestore();
+db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+
+let sesion=null;
+const $=id=>document.getElementById(id);
+const fmt=n=>new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(n||0);
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const hoy=new Date(),mesAct=hoy.getMonth(),anioAct=hoy.getFullYear();
+const claveMes=`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;
+
+function hoyISO(){const d=new Date(),o=d.getTimezoneOffset();return new Date(d.getTime()-o*60000).toISOString().split('T')[0];}
+$('fechaHoy').textContent=hoy.toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+function bdg(t){const m={'Bonificación a cliente':'bonif','Bono/Extra a personal':'bono','Nómina/Sueldos':'nom','Vehículos: mantenimiento':'mantto','Vehículos: casetas/estac/talacha':'cas','Viáticos/Foráneas':'viat','Custodia/Seguridad':'cust','Oficina/Papelería/Bodega':'of','Servicios (luz/agua/internet)':'serv','Local: limpieza/mantto':'limp','Préstamo/Faltante a personal':'prest','Dirección/Socios':'dir','Salud/Farmacia':'sal','Otros/Revisar':'ot'};return `badge b-${m[t]||'ot'}`;}
+
+/* LOGIN — solo admins y viewer */
+$('loginBtn').addEventListener('click',doLogin);
+$('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+async function doLogin(){
+  const u=$('loginUser').value.trim().toLowerCase();
+  const p=$('loginPass').value;
+  $('loginBtn').disabled=true;$('loginBtn').textContent='Verificando...';
+  try{
+    const doc=await db.collection('usuarios').doc(u).get();
+    if(!doc.exists||doc.data().pass!==p||doc.data().estado==='inactivo'){
+      $('loginErr').style.display='block';$('loginBtn').disabled=false;$('loginBtn').textContent='Entrar al dashboard';return;
+    }
+    const data=doc.data();
+    if(data.rol!=='admin'&&data.rol!=='viewer'){
+      $('loginErr').style.display='block';$('loginErr').textContent='Este acceso es solo para dirección y administradores.';
+      $('loginBtn').disabled=false;$('loginBtn').textContent='Entrar al dashboard';return;
+    }
+    sesion={user:u,rol:data.rol};
+    sessionStorage.setItem('fg_dash_ses',JSON.stringify(sesion));
+    db.collection('usuarios').doc(u).update({ultimoAcceso:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    iniciar();
+  }catch(e){$('loginErr').style.display='block';$('loginBtn').disabled=false;$('loginBtn').textContent='Entrar al dashboard';}
+}
+function iniciar(){
+  $('loginOv').style.display='none';
+  $('userBadge').textContent=sesion.user;
+  $('logoutBtn').style.display='block';
+  // aplicar mes actual como filtro default
+  const hoy=new Date();
+  const anio=hoy.getFullYear();
+  const mes=String(hoy.getMonth()+1).padStart(2,'0');
+  const primerDia=`${anio}-${mes}-01`;
+  const ultimoDia=`${anio}-${mes}-${String(new Date(anio,hoy.getMonth()+1,0).getDate()).padStart(2,'0')}`;
+  $('fDesde').value=primerDia;
+  $('fHasta').value=ultimoDia;
+  suscribir();
+  verificarCorte();
+  setTimeout(()=>analizarAuto(),1500);
+}
+$('logoutBtn').addEventListener('click',()=>{sessionStorage.removeItem('fg_dash_ses');location.reload();});
+const sg=sessionStorage.getItem('fg_dash_ses');
+if(sg){sesion=JSON.parse(sg);iniciar();}
+
+/* CORTE 6PM */
+function verificarCorte(){
+  const h=new Date().getHours();
+  if(h>=17&&h<20){
+    const b=$('corteBanner');
+    b.style.display='block';
+    b.textContent=`⏰ Corte del día — son las ${new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'})}. Verifica que todas las sucursales hayan capturado sus movimientos de hoy.`;
+  }
+}
+setInterval(verificarCorte,60000);
+
+/* FILTROS */
+function filtrar(){
+  const s=$('fSuc').value,d=$('fDesde').value,h=$('fHasta').value;
+  return movimientos.filter(m=>(!s||m.sucursal===s)&&(!d||m.fecha>=d)&&(!h||m.fecha<=h));
+}
+['fSuc','fDesde','fHasta'].forEach(id=>$(id).addEventListener('change',renderTodo));
+$('hoyBtn').addEventListener('click',()=>{const h=hoyISO();$('fDesde').value=h;$('fHasta').value=h;renderTodo();});
+$('semBtn').addEventListener('click',()=>{
+  const hoy=new Date(),dow=hoy.getDay()||7;
+  const lun=new Date(hoy);lun.setDate(hoy.getDate()-(dow-1));
+  const dom=new Date(lun);dom.setDate(lun.getDate()+6);
+  const fmt2=d=>{const o=d.getTimezoneOffset();return new Date(d.getTime()-o*60000).toISOString().split('T')[0];};
+  $('fDesde').value=fmt2(lun);$('fHasta').value=fmt2(dom);renderTodo();
+});
+$('clearBtn').addEventListener('click',()=>{['fSuc','fDesde','fHasta'].forEach(id=>$(id).value='');renderTodo();});
+['dTipo','dSuc','dFecha'].forEach(id=>$(id).addEventListener('change',()=>renderDetalle(filtrar())));
+$('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFecha'].forEach(id=>$(id).value='');renderDetalle(filtrar());});
+
+/* FIREBASE */
+let movimientos=[],catalogoFijos=[],estadosFijos={},efectivaleRegs=[];
+let chartCat=null,chartComp=null;
+function suscribir(){
+  db.collection('movimientos').orderBy('creadoEn','desc').onSnapshot(snap=>{
+    movimientos=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTodo();
+    analizarAuto();
+  });
+  db.collection('efectivale').orderBy('creadoEn','desc').onSnapshot(snap=>{
+    efectivaleRegs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTodo();
+  });
+  db.collection('fijos_catalogo').onSnapshot(snap=>{catalogoFijos=snap.docs.map(d=>({id:d.id,...d.data()}));renderTodo();});
+  db.collection('fijos_estados').doc('global').onSnapshot(doc=>{estadosFijos=doc.exists?doc.data():{};renderTodo();});
+}
+
+/* RENDER PRINCIPAL */
+function renderTodo(){
+  const f=filtrar();
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
+  const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
+  const total=gastos.reduce((a,m)=>a+m.monto,0);
+  const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
+  const sinComp=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
+
+  $('hGasto').textContent=fmt(total);
+  $('hGastoSub').textContent=`${gastos.length} movimientos`;
+  $('hBonif').textContent=fmt(totalBonif);
+  $('hBonifSub').textContent=`${bonifs.length} registros`;
+  $('hSinComp').textContent=sinComp.length;
+
+  const fijosTotal=catalogoFijos.reduce((a,c)=>a+c.monto,0);
+  const fijosPend=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente').reduce((a,c)=>a+c.monto,0);
+  $('hPend').textContent=fmt(fijosPend);
+  $('hPendSub').textContent=`${MESES[mesAct]} ${anioAct}`;
+
+  // ─── BARRA DE TOTALES CONSOLIDADOS ───
+  const desde=$('fDesde').value;const hasta=$('fHasta').value;
+  const sucFiltro=$('fSuc').value;
+  let efectFilt=efectivaleRegs;
+  if(desde)efectFilt=efectFilt.filter(r=>(r.fecha||'').substring(0,10)>=desde);
+  if(hasta)efectFilt=efectFilt.filter(r=>(r.fecha||'').substring(0,10)<=hasta);
+  if(sucFiltro)efectFilt=efectFilt.filter(r=>r.sucursal===sucFiltro);
+  const totalEfect=efectFilt.reduce((a,r)=>a+r.cargo,0);
+  const efectPorSuc=['CDMX','Morelos','Puebla'].map(s=>{const v=efectFilt.filter(r=>r.sucursal===s).reduce((a,r)=>a+r.cargo,0);return v>0?`${s} ${fmt(v)}`:null;}).filter(Boolean);
+  $('totalOpBarra').textContent=fmt(total);
+  $('totalOpMovBarra').textContent=`${gastos.length} movimiento${gastos.length!==1?'s':''}`;
+  $('totalBonifBarra').textContent=fmt(totalBonif);
+  $('totalBonifMovBarra').textContent=`${bonifs.length} registro${bonifs.length!==1?'s':''}`;
+  $('totalEfectBarra').textContent=fmt(totalEfect);
+  $('totalEfectDetBarra').textContent=efectPorSuc.length?efectPorSuc.join(' · '):'Sin recargas';
+  $('totalFijosBarra').textContent=fmt(fijosTotal);
+  $('totalFijosPendBarra').textContent=`${fmt(fijosPend)} pendientes`;
+  $('totalEgresosBarra').textContent=fmt(total+totalBonif+totalEfect+fijosTotal);
+
+  // categorías
+  const tots={mantto:0,viat:0,nom:0,prest:0,otros:0};
+  gastos.forEach(m=>{
+    if(m.tipo==='Vehículos: mantenimiento')tots.mantto+=m.monto;
+    else if(m.tipo==='Viáticos/Foráneas')tots.viat+=m.monto;
+    else if(m.concepto==='Préstamo caja chica para nómina semanal')tots.nom+=m.monto;
+    else if(m.tipo==='Préstamo/Faltante a personal')tots.prest+=m.monto;
+    else tots.otros+=m.monto;
+  });
+  $('cMantto').textContent=fmt(tots.mantto);$('cViat').textContent=fmt(tots.viat);$('cNom').textContent=fmt(tots.nom);$('cPrest').textContent=fmt(tots.prest);$('cOtros').textContent=fmt(tots.otros);
+
+  // alertas
+  const asc=$('alertaSinComp');
+  if(!sinComp.length)asc.innerHTML='<div class="alert-empty">Sin alertas ✓</div>';
+  else asc.innerHTML=sinComp.slice(0,6).map(m=>`<div class="alert-item"><span>${m.fecha} · ${m.sucursal} · ${m.concepto}</span><span>${fmt(m.monto)}</span></div>`).join('')+(sinComp.length>6?`<div style="font-size:10.5px;color:var(--danger);margin-top:3px;">…y ${sinComp.length-6} más</div>`:'');
+
+  const autors=gastos.filter(m=>m.autorizado);
+  const aau=$('alertaAutor');
+  if(!autors.length)aau.innerHTML='<div class="alert-empty">Sin movimientos mayores ✓</div>';
+  else aau.innerHTML=autors.slice(0,6).map(m=>`<div class="alert-item"><span>${m.fecha} · ${m.concepto}<br><small>Autorizó: ${m.autorizado}</small></span><span>${fmt(m.monto)}</span></div>`).join('');
+
+  // sucursales
+  $('sucGrid').innerHTML=['CDMX','Morelos','Puebla'].map(suc=>{
+    const ms=gastos.filter(m=>m.sucursal===suc);
+    const tt={mantto:0,viat:0,nom:0,prest:0,otros:0};
+    ms.forEach(m=>{
+      if(m.tipo==='Vehículos: mantenimiento')tt.mantto+=m.monto;
+      else if(m.tipo==='Viáticos/Foráneas')tt.viat+=m.monto;
+      else if(m.concepto==='Préstamo caja chica para nómina semanal')tt.nom+=m.monto;
+      else if(m.tipo==='Préstamo/Faltante a personal')tt.prest+=m.monto;
+      else tt.otros+=m.monto;
+    });
+    const tot=Object.values(tt).reduce((a,b)=>a+b,0);
+    const hoyMov=f.filter(m=>m.sucursal===suc&&m.fecha===hoyISO()).length;
+    return `<div class="suc-card"><h3>${suc} <small style="font-size:10px;color:var(--muted);font-weight:400;">${hoyMov} mov. hoy</small></h3>
+      <div class="suc-row"><span>Veh: mantto</span><span>${fmt(tt.mantto)}</span></div>
+      <div class="suc-row"><span>Viáticos</span><span>${fmt(tt.viat)}</span></div>
+      <div class="suc-row"><span>Caja chica nómina</span><span>${fmt(tt.nom)}</span></div>
+      <div class="suc-row"><span>Préstamos</span><span>${fmt(tt.prest)}</span></div>
+      <div class="suc-row"><span>Otros</span><span>${fmt(tt.otros)}</span></div>
+      <div class="suc-row"><span>Total gasto</span><span>${fmt(tot)}</span></div>
+    </div>`;
+  }).join('');
+
+  // bonificaciones
+  $('bonifBlock').style.display=bonifs.length?'block':'none';
+  $('bonifTbody').innerHTML=bonifs.map(m=>`<tr>
+    <td>${m.fecha}</td><td>${m.sucursal}</td>
+    <td>${m.bonifCliente||'—'}</td><td>${m.bonifCuenta||'—'}</td>
+    <td>${m.bonifPct||'—'}%</td><td class="ac">${fmt(m.monto)}</td>
+    <td style="color:${m.bonifCuadra==='Sí'?'var(--ok)':'var(--warn)'};">${m.bonifCuadra||'—'}</td>
+    <td>${m.bonifFolios||'—'}</td><td>${m.capturista}</td>
+  </tr>`).join('');
+
+  // gráficas
+  const ctx1=$('chartCat').getContext('2d');
+  if(chartCat)chartCat.destroy();
+  const cats=['Veh: mantto','Viáticos','Nómina','Préstamos','Otros'];
+  chartCat=new Chart(ctx1,{type:'doughnut',data:{labels:cats,datasets:[{data:[tots.mantto,tots.viat,tots.nom,tots.prest,tots.otros],backgroundColor:['#5a7d99','#c8a020','#2e7d45','#b5482a','#8a857a'],borderWidth:0}]},options:{plugins:{legend:{position:'right',labels:{font:{size:11}}}},maintainAspectRatio:false}});
+
+  const ctx2=$('chartComp').getContext('2d');
+  if(chartComp)chartComp.destroy();
+  chartComp=new Chart(ctx2,{type:'bar',data:{labels:['Gasto diario','Gastos fijos mes'],datasets:[{data:[total,fijosTotal],backgroundColor:['#b5482a','#5a7d99'],borderRadius:6,borderWidth:0}]},options:{plugins:{legend:{display:false}},maintainAspectRatio:false,scales:{y:{beginAtZero:true,ticks:{callback:v=>fmt(v)}}}}});
+
+  // fijos
+  const tbF=$('tbFijos');
+  if(!catalogoFijos.length){tbF.innerHTML='<tr class="erow"><td colspan="5">Sin gastos fijos configurados.</td></tr>';}
+  else tbF.innerHTML=catalogoFijos.map(c=>{const est=estadosFijos[`${claveMes}_${c.id}`]||'pendiente';return`<tr><td>${c.concepto}</td><td>${c.sucursal}</td><td>${c.dia?'Día '+c.dia:'—'}</td><td class="ac">${fmt(c.monto)}</td><td><span class="ep ${est}">${est==='pagado'?'Pagado':'Pendiente'}</span></td></tr>`;}).join('');
+
+  renderDetalle(f);
+  actualizarChips(f);
+}
+
+function renderDetalle(base){
+  const t=$('dTipo').value,s=$('dSuc').value,fecha=$('dFecha').value;
+  const f=base.filter(m=>(!t||m.tipo===t)&&(!s||m.sucursal===s)&&(!fecha||m.fecha===fecha));
+  const tb=$('tbDetalle');
+  if(!f.length){tb.innerHTML='<tr class="erow"><td colspan="10">Sin movimientos.</td></tr>';return;}
+  tb.innerHTML=[...f].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(m=>{
+    const ts=m.creadoEn?.toDate?m.creadoEn.toDate().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}):'—';
+    return `<tr>
+      <td>${m.fecha}</td><td style="color:var(--muted);font-size:11px;">${ts}</td>
+      <td><span class="${bdg(m.tipo)}">${m.tipo}</span></td>
+      <td>${m.sucursal}</td><td>${m.persona||'—'}</td>
+      <td>${m.concepto}${!m.comprobante&&!m.causaRaiz&&m.tipo!=='Bonificación a cliente'?'<span title="Sin comprobante ni causa raíz" style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td>
+      <td class="ac">${fmt(m.monto)}</td>
+      <td>${m.autorizado||'—'}</td>
+      <td>${m.comprobante?'📎':'—'}</td>
+      <td>${m.capturista}</td>
+    </tr>`;
+  }).join('');
+}
+
+function actualizarChips(f){
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
+  const sinComp=gastos.filter(m=>!m.comprobante&&!m.causaRaiz).length;
+  const autors=gastos.filter(m=>m.autorizado).length;
+  const chips=[];
+  if(sinComp>0)chips.push(`<span class="chip chip-r">⚠ ${sinComp} sin comprobante</span>`);
+  if(autors>0)chips.push(`<span class="chip chip-w">⚡ ${autors} con autorización</span>`);
+  chips.push('<span class="chip chip-g">✓ Firebase en tiempo real</span>');
+  $('agenteChips').innerHTML=chips.join('');
+}
+
+/* ─── AGENTE INTELIGENTE LOCAL ─── */
+let historial=[];
+
+function analizarDatos(){
+  const f=filtrar();
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
+  const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
+  const hoyStr=hoyISO();
+  const total=gastos.reduce((a,m)=>a+m.monto,0);
+  const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
+  const sinComp=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
+  const conAutor=gastos.filter(m=>m.autorizado);
+  const fijosPend=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente');
+  const porSuc={};['CDMX','Morelos','Puebla'].forEach(s=>{
+    const ms=gastos.filter(m=>m.sucursal===s);
+    const msTotal=f.filter(m=>m.sucursal===s); // incluye bonificaciones
+    porSuc[s]={total:ms.reduce((a,m)=>a+m.monto,0),count:ms.length,hoy:msTotal.filter(m=>m.fecha===hoyStr).length};
+  });
+  const porTipo={};gastos.forEach(m=>{porTipo[m.tipo]=(porTipo[m.tipo]||0)+m.monto;});
+  const topTipo=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
+  const sinCapturarHoy=['CDMX','Morelos','Puebla'].filter(s=>porSuc[s].hoy===0);
+  const bonifNoCuadran=bonifs.filter(m=>m.bonifCuadra==='No');
+  const gastosMayores=gastos.filter(m=>m.monto>=10000);
+  const parrafos=[];
+  if(gastos.length===0){
+    parrafos.push('Sin movimientos capturados en el periodo seleccionado. Ajusta los filtros de fecha o espera a que las sucursales empiecen a capturar.');
+  } else {
+    const sucTop=Object.entries(porSuc).sort((a,b)=>b[1].total-a[1].total)[0];
+    parrafos.push(`En el periodo hay <strong>${fmt(total)}</strong> en gasto operativo distribuidos en <strong>${gastos.length} movimientos</strong>. La sucursal con mayor gasto es <strong>${sucTop[0]}</strong> con ${fmt(sucTop[1].total)}.`);
+  }
+  if(topTipo.length>0){
+    const pct=total>0?((topTipo[0][1]/total)*100).toFixed(0):0;
+    parrafos.push(`La categoría con mayor peso es <strong>${topTipo[0][0]}</strong> con ${fmt(topTipo[0][1])} (${pct}% del gasto total del periodo).`);
+  }
+  if(bonifs.length>0){
+    const alertaBonif=bonifNoCuadran.length>0?` <span style="color:#f0a0a0;">⚠ ${bonifNoCuadran.length} bonificación(es) NO cuadran con lo pactado — revisar con el área comercial.</span>`:'Todas cuadran con lo pactado ✓';
+    parrafos.push(`Bonificaciones a clientes: <strong>${fmt(totalBonif)}</strong> en ${bonifs.length} registro(s). ${alertaBonif}`);
+  }
+  const alertas=[];
+  if(sinComp.length>0) alertas.push(`<span style="color:#f0a0a0;">🚫 ${sinComp.length} gasto(s) sin comprobante ni causa raíz — requieren atención inmediata.</span>`);
+  if(sinCapturarHoy.length>0) alertas.push(`<span style="color:#f0d080;">⏰ Las sucursales <strong>${sinCapturarHoy.join(', ')}</strong> no han capturado nada hoy.</span>`);
+  if(gastosMayores.length>0) alertas.push(`<span style="color:#f0d080;">⚡ ${gastosMayores.length} gasto(s) mayores a $10,000 en el periodo — verificar autorizaciones.</span>`);
+  if(fijosPend.length>0) alertas.push(`<span style="color:#f0d080;">📋 ${fijosPend.length} gasto(s) fijo(s) pendientes de pago este mes (${fmt(fijosPend.reduce((a,c)=>a+c.monto,0))}).</span>`);
+  if(conAutor.length>0) alertas.push(`<span style="color:#9eb8a8;">✓ ${conAutor.length} gasto(s) con autorización especial registrada.</span>`);
+  if(alertas.length>0) parrafos.push(alertas.join('<br>'));
+  if(sinComp.length===0&&sinCapturarHoy.length===0&&bonifNoCuadran.length===0){
+    parrafos.push('Todo en orden: sin alertas activas, todas las sucursales han capturado y los comprobantes están completos.');
+  }
+  return parrafos.join('<br><br>');
+}
+
+function responderPregunta(pregunta){
+  const p=pregunta.toLowerCase();
+  const f=filtrar();
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
+  const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
+  const hoyStr=hoyISO();
+  if(p.includes('sucursal')&&(p.includes('más')||p.includes('mayor')||p.includes('mas'))){
+    const por={};['CDMX','Morelos','Puebla'].forEach(s=>{por[s]=gastos.filter(m=>m.sucursal===s).reduce((a,m)=>a+m.monto,0);});
+    return `Por sucursal:<br>${Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([s,v])=>`<strong>${s}:</strong> ${fmt(v)}`).join('<br>')}`;
+  }
+  if(p.includes('hoy')||p.includes('día')||p.includes('dia')){
+    const hoyStr2=hoyISO();
+    const hoyMov=f.filter(m=>m.fecha===hoyStr2); // incluye bonificaciones
+    const hoyGastos=gastos.filter(m=>m.fecha===hoyStr2);
+    const por={CDMX:0,Morelos:0,Puebla:0};hoyGastos.forEach(m=>{por[m.sucursal]=(por[m.sucursal]||0)+m.monto;});
+    const sinHoy=['CDMX','Morelos','Puebla'].filter(s=>!hoyMov.find(m=>m.sucursal===s));
+    let resp=`Hoy: <strong>${fmt(hoyGastos.reduce((a,m)=>a+m.monto,0))}</strong> en gasto operativo (${hoyGastos.length} movimientos).<br>${Object.entries(por).filter(([,v])=>v>0).map(([s,v])=>`${s}: ${fmt(v)}`).join(' · ')}`;
+    if(sinHoy.length>0) resp+=`<br><span style="color:#f0d080;">⏰ Sin captura hoy: ${sinHoy.join(', ')}</span>`;
+    return resp;
+  }
+  if(p.includes('comprobante')||p.includes('falta')||p.includes('sin comprobar')){
+    const sc=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
+    if(!sc.length) return 'No hay gastos sin comprobante ni causa raíz. ✓';
+    return `<strong>${sc.length} gasto(s)</strong> sin comprobante ni causa raíz:<br>${sc.slice(0,5).map(m=>`${m.fecha} · ${m.sucursal} · ${m.concepto} · ${fmt(m.monto)}`).join('<br>')}${sc.length>5?`<br>…y ${sc.length-5} más`:''}`;
+  }
+  if(p.includes('bonific')){
+    if(!bonifs.length) return 'No hay bonificaciones en el periodo.';
+    const noCuadran=bonifs.filter(m=>m.bonifCuadra==='No');
+    let resp=`Bonificaciones: <strong>${fmt(bonifs.reduce((a,m)=>a+m.monto,0))}</strong> en ${bonifs.length} registro(s).`;
+    if(noCuadran.length) resp+=`<br><span style="color:#f0a0a0;">⚠ ${noCuadran.length} NO cuadran.</span>`;
+    else resp+='<br>Todas cuadran ✓';
+    return resp;
+  }
+  if(p.includes('categoría')||p.includes('categoria')||p.includes('tipo')){
+    const por={};gastos.forEach(m=>{por[m.tipo]=(por[m.tipo]||0)+m.monto;});
+    return `Top categorías:<br>${Object.entries(por).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([t,v])=>`<strong>${t}:</strong> ${fmt(v)}`).join('<br>')}`;
+  }
+  if(p.includes('fijo')||p.includes('pendiente')){
+    const pend=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente');
+    if(!pend.length) return 'Todos los gastos fijos del mes están pagados ✓';
+    return `Fijos pendientes: <strong>${fmt(pend.reduce((a,c)=>a+c.monto,0))}</strong><br>${pend.slice(0,6).map(c=>`${c.concepto} · ${c.sucursal} · ${fmt(c.monto)}`).join('<br>')}`;
+  }
+  if(p.includes('autoriza')||p.includes('grande')){
+    const grandes=gastos.filter(m=>m.monto>=5000).sort((a,b)=>b.monto-a.monto);
+    if(!grandes.length) return 'No hay gastos mayores a $5,000 en el periodo.';
+    return `Gastos mayores a $5,000:<br>${grandes.slice(0,6).map(m=>`${m.fecha} · ${m.sucursal} · ${m.concepto} · <strong>${fmt(m.monto)}</strong> · Autorizó: ${m.autorizado||'—'}`).join('<br>')}`;
+  }
+  if(p.includes('capturista')||p.includes('quién')||p.includes('quien')){
+    const por={};gastos.forEach(m=>{por[m.capturista]=(por[m.capturista]||0)+m.monto;});
+    return `Por capturista:<br>${Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<strong>${c}:</strong> ${fmt(v)}`).join('<br>')}`;
+  }
+  return analizarDatos();
+}
+
+let yaAnalizo=false;
+function analizarAuto(){
+  if(!sesion)return;
+  if(yaAnalizo)return;
+  yaAnalizo=true;
+  const body=$('agenteBody');
+  const sub=$('agenteSub');
+  body.className='agente-body';
+  body.innerHTML=analizarDatos();
+  sub.textContent='Actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+}
+
+function agregarMensajeHistorial(pregunta,respuesta){
+  const h=$('agenteHistorial');
+  const div=document.createElement('div');
+  div.innerHTML=`<div class="msg-user"><div class="msg-label">Tú preguntaste</div>${pregunta}</div><div class="msg-agent"><div class="msg-label">Análisis</div>${respuesta}</div>`;
+  h.appendChild(div);
+  h.scrollTop=h.scrollHeight;
+}
+
+$('analizarBtn').addEventListener('click',()=>{
+  const body=$('agenteBody');
+  const sub=$('agenteSub');
+  body.className='agente-body';
+  body.innerHTML=analizarDatos();
+  sub.textContent='Actualizado '+new Date().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+});
+$('preguntarBtn').addEventListener('click',()=>{const p=$('pregunta').value.trim();if(!p)return;agregarMensajeHistorial(p,responderPregunta(p));$('pregunta').value='';});
+$('pregunta').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();const p=$('pregunta').value.trim();if(p){agregarMensajeHistorial(p,responderPregunta(p));$('pregunta').value='';}}});
+
+
+/* ─── MENÚ DE REPORTES ─── */
+$('exportMenuBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  const m=$('exportMenu');
+  m.style.display=m.style.display==='none'?'block':'none';
+});
+document.addEventListener('click',()=>$('exportMenu').style.display='none');
+document.querySelectorAll('.export-opt').forEach(b=>b.addEventListener('click',()=>{
+  $('exportMenu').style.display='none';
+  generarReporte(b.dataset.rpt);
+}));
+
+function estiloCol(ws,cols){ws['!cols']=cols.map(w=>({wch:w}));}
+function filaTotal(datos,cols){
+  const fila={};
+  cols.forEach(c=>{const s=datos.reduce((a,r)=>a+(parseFloat(r[c])||0),0);fila[c]=s?s:'';});
+  return fila;
+}
+
+function generarReporte(tipo){
+  const f=filtrar();
+  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale);
+  const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
+  const wb=XLSX.utils.book_new();
+  const hoy2=hoyISO();
+  const periodoTxt=`${$('fDesde').value||'inicio'} al ${$('fHasta').value||hoy2}`;
+
+  if(tipo==='concentrado'){
+    // HOJA 1: Resumen ejecutivo
+    const resumen=[
+      {'Indicador':'Periodo analizado','Valor':periodoTxt},
+      {'Indicador':'Sucursal','Valor':$('fSuc').value||'Todas'},
+      {'Indicador':'Total gasto operativo','Valor':gastos.reduce((a,m)=>a+m.monto,0)},
+      {'Indicador':'Total bonificaciones (no gasto)','Valor':bonifs.reduce((a,m)=>a+m.monto,0)},
+      {'Indicador':'Movimientos registrados','Valor':gastos.length},
+      {'Indicador':'Sin comprobante ni causa raíz','Valor':gastos.filter(m=>!m.comprobante&&!m.causaRaiz).length},
+      {'Indicador':'Con autorización especial','Valor':gastos.filter(m=>m.autorizado).length},
+      {'Indicador':'Gastos fijos del mes','Valor':catalogoFijos.reduce((a,c)=>a+c.monto,0)},
+      {'Indicador':'Gastos fijos pendientes','Valor':catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pendiente').reduce((a,c)=>a+c.monto,0)},
+    ];
+    const ws1=XLSX.utils.json_to_sheet(resumen);
+    estiloCol(ws1,[35,20]);
+    XLSX.utils.book_append_sheet(wb,ws1,'Resumen ejecutivo');
+    // HOJA 2: Detalle gastos
+    const det=gastos.map(m=>({'Fecha':m.fecha,'Tipo':m.tipo,'Sucursal':m.sucursal,'Persona':m.persona||'','Concepto':m.concepto,'Monto':m.monto,'Capturó':m.capturista,'Autorizado por':m.autorizado||'','Causa raíz':m.causaRaiz||'','Comprobante':m.comprobante?'Sí':'No'}));
+    const ws2=XLSX.utils.json_to_sheet(det);
+    estiloCol(ws2,[12,22,10,20,28,12,14,18,22,10]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle gastos');
+    // HOJA 3: Bonificaciones
+    if(bonifs.length){
+      const db2=bonifs.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Cliente':m.bonifCliente||'','Cuenta':m.bonifCuenta||'','Desc%':m.bonifPct||'','Monto bonificado':m.monto,'¿Cuadra?':m.bonifCuadra||'','Folios':m.bonifFolios||'','Capturó':m.capturista}));
+      const ws3=XLSX.utils.json_to_sheet(db2);
+      estiloCol(ws3,[12,10,24,12,8,16,10,18,14]);
+      XLSX.utils.book_append_sheet(wb,ws3,'Bonificaciones');
+    }
+    XLSX.writeFile(wb,`Concentrado_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='sucursales'){
+    ['CDMX','Morelos','Puebla'].forEach(suc=>{
+      const ms=gastos.filter(m=>m.sucursal===suc);
+      if(!ms.length){
+        const ws=XLSX.utils.json_to_sheet([{'Sucursal':suc,'Nota':'Sin movimientos en el periodo'}]);
+        XLSX.utils.book_append_sheet(wb,ws,suc);return;
+      }
+      // resumen por categoría
+      const porCat={};ms.forEach(m=>{porCat[m.tipo]=(porCat[m.tipo]||0)+m.monto;});
+      const res=Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([t,v])=>({'Categoría':t,'Total':v,'% del gasto':((v/ms.reduce((a,m)=>a+m.monto,0))*100).toFixed(1)+'%'}));
+      res.push({'Categoría':'TOTAL','Total':ms.reduce((a,m)=>a+m.monto,0),'% del gasto':'100%'});
+      const ws=XLSX.utils.json_to_sheet(res);
+      estiloCol(ws,[28,14,12]);
+      // detalle debajo
+      XLSX.utils.sheet_add_aoa(ws,[[]],{origin:-1});
+      XLSX.utils.sheet_add_aoa(ws,[['Fecha','Tipo','Persona','Concepto','Monto','Autorizado','Comp.','Capturó']],{origin:-1});
+      ms.forEach(m=>XLSX.utils.sheet_add_aoa(ws,[[m.fecha,m.tipo,m.persona||'',m.concepto,m.monto,m.autorizado||'',m.comprobante?'Sí':'No',m.capturista]],{origin:-1}));
+      XLSX.utils.book_append_sheet(wb,ws,suc);
+    });
+    XLSX.writeFile(wb,`Por_Sucursal_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='categorias'){
+    const TIPOS=['Bono/Extra a personal','Nómina/Sueldos','Vehículos: mantenimiento','Vehículos: casetas/estac/talacha','Viáticos/Foráneas','Custodia/Seguridad','Oficina/Papelería/Bodega','Servicios (luz/agua/internet)','Local: limpieza/mantto','Préstamo/Faltante a personal','Dirección/Socios','Salud/Farmacia','Otros/Revisar'];
+    // resumen por categoría y sucursal
+    const filas=TIPOS.map(t=>{
+      const tot=gastos.filter(m=>m.tipo===t).reduce((a,m)=>a+m.monto,0);
+      const cdmx=gastos.filter(m=>m.tipo===t&&m.sucursal==='CDMX').reduce((a,m)=>a+m.monto,0);
+      const mor=gastos.filter(m=>m.tipo===t&&m.sucursal==='Morelos').reduce((a,m)=>a+m.monto,0);
+      const pue=gastos.filter(m=>m.tipo===t&&m.sucursal==='Puebla').reduce((a,m)=>a+m.monto,0);
+      const totalAll=gastos.reduce((a,m)=>a+m.monto,0);
+      return{'Categoría':t,'CDMX':cdmx,'Morelos':mor,'Puebla':pue,'Total':tot,'% del periodo':totalAll?((tot/totalAll)*100).toFixed(1)+'%':'0%'};
+    });
+    const totalRow={'Categoría':'TOTAL','CDMX':gastos.filter(m=>m.sucursal==='CDMX').reduce((a,m)=>a+m.monto,0),'Morelos':gastos.filter(m=>m.sucursal==='Morelos').reduce((a,m)=>a+m.monto,0),'Puebla':gastos.filter(m=>m.sucursal==='Puebla').reduce((a,m)=>a+m.monto,0),'Total':gastos.reduce((a,m)=>a+m.monto,0),'% del periodo':'100%'};
+    filas.push(totalRow);
+    const ws=XLSX.utils.json_to_sheet(filas);
+    estiloCol(ws,[28,14,14,14,14,14]);
+    XLSX.utils.book_append_sheet(wb,ws,'Por categoría');
+    // segunda hoja: detalle por día
+    const porDia={};gastos.forEach(m=>{porDia[m.fecha]=(porDia[m.fecha]||0)+m.monto;});
+    const dias=Object.entries(porDia).sort().map(([f,v])=>({'Fecha':f,'Total del día':v,'Movimientos':gastos.filter(m=>m.fecha===f).length}));
+    const ws2=XLSX.utils.json_to_sheet(dias);
+    estiloCol(ws2,[14,16,14]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Gasto por día');
+    XLSX.writeFile(wb,`Categorias_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='bonificaciones'){
+    if(!bonifs.length){alert('No hay bonificaciones en el periodo seleccionado.');return;}
+    // resumen por cliente
+    const porCliente={};
+    bonifs.forEach(m=>{
+      const k=m.bonifCliente||'Sin cliente';
+      if(!porCliente[k])porCliente[k]={cliente:k,cuenta:m.bonifCuenta||'',movimientos:0,total:0,nosCuadra:0,noCuadra:0};
+      porCliente[k].movimientos++;
+      porCliente[k].total+=m.monto;
+      if(m.bonifCuadra==='Sí')porCliente[k].nosCuadra++;
+      else porCliente[k].noCuadra++;
+    });
+    const res=Object.values(porCliente).sort((a,b)=>b.total-a.total).map(c=>({'Cliente':c.cliente,'Cuenta':c.cuenta,'Movimientos':c.movimientos,'Total bonificado':c.total,'Cuadran':c.nosCuadra,'No cuadran':c.noCuadra,'Estado':c.noCuadra>0?'⚠ Revisar':'✓ OK'}));
+    const ws1=XLSX.utils.json_to_sheet(res);
+    estiloCol(ws1,[24,12,12,16,10,10,12]);
+    XLSX.utils.book_append_sheet(wb,ws1,'Resumen por cliente');
+    // detalle completo
+    const det=bonifs.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Cliente':m.bonifCliente||'','Cuenta':m.bonifCuenta||'','Descuento pactado %':m.bonifPct||'','Monto bonificado':m.monto,'¿Cuadra?':m.bonifCuadra||'Pendiente','Folios de factura':m.bonifFolios||'','Capturó':m.capturista}));
+    const ws2=XLSX.utils.json_to_sheet(det);
+    estiloCol(ws2,[12,10,24,12,18,16,10,22,14]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle bonificaciones');
+    XLSX.writeFile(wb,`Bonificaciones_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='sincomprobar'){
+    const sc=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
+    const cc=gastos.filter(m=>!m.comprobante&&m.causaRaiz);
+    if(!sc.length&&!cc.length){alert('No hay gastos sin comprobar en el periodo. ✓');return;}
+    if(sc.length){
+      const d1=sc.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Tipo':m.tipo,'Persona':m.persona||'','Concepto':m.concepto,'Monto':m.monto,'Capturó':m.capturista,'Autorizado por':m.autorizado||'','Acción requerida':'Solicitar comprobante o causa raíz'}));
+      const ws1=XLSX.utils.json_to_sheet(d1);
+      estiloCol(ws1,[12,10,22,20,28,12,14,18,28]);
+      XLSX.utils.book_append_sheet(wb,ws1,'Sin comprobante ni causa');
+    }
+    if(cc.length){
+      const d2=cc.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Tipo':m.tipo,'Persona':m.persona||'','Concepto':m.concepto,'Monto':m.monto,'Causa raíz registrada':m.causaRaiz,'Capturó':m.capturista}));
+      const ws2=XLSX.utils.json_to_sheet(d2);
+      estiloCol(ws2,[12,10,22,20,28,12,26,14]);
+      XLSX.utils.book_append_sheet(wb,ws2,'Con causa raíz sin comprobante');
+    }
+    XLSX.writeFile(wb,`SinComprobar_Ferregama_${hoy2}.xlsx`);
+
+  } else if(tipo==='fijosvsvar'){
+    const totalVar=gastos.reduce((a,m)=>a+m.monto,0);
+    const totalFijos=catalogoFijos.reduce((a,c)=>a+c.monto,0);
+    const fijosPag=catalogoFijos.filter(c=>(estadosFijos[`${claveMes}_${c.id}`]||'pendiente')==='pagado').reduce((a,c)=>a+c.monto,0);
+    const fijosPend=totalFijos-fijosPag;
+    const totalGeneral=totalVar+totalFijos;
+    // resumen
+    const res=[
+      {'Concepto':'Gasto variable (efectivo)','Monto':totalVar,'% del total':totalGeneral?((totalVar/totalGeneral)*100).toFixed(1)+'%':'—'},
+      {'Concepto':'Gastos fijos del mes','Monto':totalFijos,'% del total':totalGeneral?((totalFijos/totalGeneral)*100).toFixed(1)+'%':'—'},
+      {'Concepto':'   — Pagados','Monto':fijosPag,'% del total':''},
+      {'Concepto':'   — Pendientes','Monto':fijosPend,'% del total':''},
+      {'Concepto':'TOTAL EGRESOS DEL MES','Monto':totalGeneral,'% del total':'100%'},
+    ];
+    const ws1=XLSX.utils.json_to_sheet(res);
+    estiloCol(ws1,[30,16,14]);
+    XLSX.utils.book_append_sheet(wb,ws1,'Fijos vs Variables');
+    // detalle fijos con estado
+    const detF=catalogoFijos.map(c=>({'Concepto':c.concepto,'Sucursal':c.sucursal,'Día de pago':c.dia||'—','Monto':c.monto,'Estado':estadosFijos[`${claveMes}_${c.id}`]||'pendiente','Mes':MESES[mesAct]+' '+anioAct}));
+    const ws2=XLSX.utils.json_to_sheet(detF);
+    estiloCol(ws2,[28,12,12,14,12,16]);
+    XLSX.utils.book_append_sheet(wb,ws2,'Detalle gastos fijos');
+    // gasto variable por categoría
+    const porCat={};gastos.forEach(m=>{porCat[m.tipo]=(porCat[m.tipo]||0)+m.monto;});
+    const detV=Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([t,v])=>({'Categoría':t,'Monto':v,'% del variable':totalVar?((v/totalVar)*100).toFixed(1)+'%':'0%'}));
+    const ws3=XLSX.utils.json_to_sheet(detV);
+    estiloCol(ws3,[28,14,16]);
+    XLSX.utils.book_append_sheet(wb,ws3,'Gasto variable por categoría');
+    XLSX.writeFile(wb,`FijosVsVariables_Ferregama_${hoy2}.xlsx`);
+  }
+}
+
+</script>
+</body>
+</html>
