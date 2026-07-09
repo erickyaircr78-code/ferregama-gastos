@@ -420,6 +420,14 @@ function iniciar(){
   $('loginOv').style.display='none';
   $('userBadge').textContent=sesion.user;
   $('logoutBtn').style.display='block';
+  // aplicar mes actual como filtro default
+  const hoy=new Date();
+  const anio=hoy.getFullYear();
+  const mes=String(hoy.getMonth()+1).padStart(2,'0');
+  const primerDia=`${anio}-${mes}-01`;
+  const ultimoDia=`${anio}-${mes}-${String(new Date(anio,hoy.getMonth()+1,0).getDate()).padStart(2,'0')}`;
+  $('fDesde').value=primerDia;
+  $('fHasta').value=ultimoDia;
   suscribir();
   verificarCorte();
   setTimeout(()=>analizarAuto(),1500);
@@ -498,8 +506,8 @@ function renderTodo(){
   const desde=$('fDesde').value;const hasta=$('fHasta').value;
   const sucFiltro=$('fSuc').value;
   let efectFilt=efectivaleRegs;
-  if(desde)efectFilt=efectFilt.filter(r=>r.fecha>=desde);
-  if(hasta)efectFilt=efectFilt.filter(r=>r.fecha<=hasta);
+  if(desde)efectFilt=efectFilt.filter(r=>(r.fecha||'').substring(0,10)>=desde);
+  if(hasta)efectFilt=efectFilt.filter(r=>(r.fecha||'').substring(0,10)<=hasta);
   if(sucFiltro)efectFilt=efectFilt.filter(r=>r.sucursal===sucFiltro);
   const totalEfect=efectFilt.reduce((a,r)=>a+r.cargo,0);
   const efectPorSuc=['CDMX','Morelos','Puebla'].map(s=>{const v=efectFilt.filter(r=>r.sucursal===s).reduce((a,r)=>a+r.cargo,0);return v>0?`${s} ${fmt(v)}`:null;}).filter(Boolean);
