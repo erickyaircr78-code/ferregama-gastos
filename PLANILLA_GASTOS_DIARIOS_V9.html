@@ -340,25 +340,29 @@ tr:hover td{background:#faf8f3;}
 
           <!-- CAMPOS EFECTIVALE -->
           <div class="efect-extra" id="efectExtra">
-            <p class="ct">Recarga Efectivale — datos</p>
-            <div class="bonif-extra-grid">
-              <div class="fg"><label>Sucursal que recibe *</label>
-                <select id="efectSucursal">
-                  <option value="">Selecciona sucursal</option>
-                  <option value="CDMX">CDMX</option>
-                  <option value="Morelos">Morelos</option>
-                  <option value="Puebla">Puebla</option>
-                </select>
+            <p class="ct">⛽ Efectivale — Carga de reporte del portal</p>
+            <p style="font-size:11px;color:var(--muted);margin-bottom:12px;">Sube los 2 archivos XLS que descargaste del portal. El sistema clasifica automáticamente por sucursal y tipo de gasto.</p>
+
+            <div class="grid2" style="margin-bottom:12px;">
+              <div>
+                <div class="m-label">Archivo 1 — CDMX</div>
+                <div class="comp-z" id="efect1Z" style="padding:10px;font-size:12px;">📂 Subir XLS CDMX<input type="file" id="efect1Input" accept=".xls,.xlsx" style="display:none;"></div>
+                <div id="efect1Info" style="font-size:10px;color:var(--ok);margin-top:3px;display:none;"></div>
               </div>
-              <div class="fg"><label>Monto recargado *</label>
-                <div class="aw"><span class="sym">$</span><input type="number" id="efectMonto" inputmode="decimal" step="0.01" placeholder="0.00"></div>
+              <div>
+                <div class="m-label">Archivo 2 — Puebla y Morelos</div>
+                <div class="comp-z" id="efect2Z" style="padding:10px;font-size:12px;">📂 Subir XLS Puebla/Morelos<input type="file" id="efect2Input" accept=".xls,.xlsx" style="display:none;"></div>
+                <div id="efect2Info" style="font-size:10px;color:var(--ok);margin-top:3px;display:none;"></div>
               </div>
             </div>
-            <div class="fg" style="margin-bottom:0;">
-              <label>Comprobante del portal Efectivale</label>
-              <div class="comp-z" id="efectCompZ" style="padding:11px;">📎 Subir captura de pantalla o PDF del portal<input type="file" id="efectCompInput" accept="image/*,application/pdf" style="display:none;" capture="environment"></div>
-              <div id="efectCompPrev" style="display:none;margin-top:6px;"><img id="efectCompImg" src="" style="max-height:80px;border-radius:7px;border:1px solid var(--line);"><button type="button" class="ibtn" id="quitarEfectComp">✕ Quitar</button></div>
+
+            <div id="efectPreview" style="display:none;background:var(--field);border-radius:8px;padding:10px;margin-bottom:10px;font-size:11px;">
+              <div style="font-weight:700;margin-bottom:6px;color:var(--ink);">Vista previa — registros detectados:</div>
+              <div id="efectResumen"></div>
             </div>
+
+            <button type="button" id="efectProcesarBtn" class="btn-submit" style="display:none;margin-bottom:6px;">✓ Guardar todos los registros en Firebase</button>
+            <div id="efectStatus" style="font-size:12px;font-weight:700;min-height:16px;"></div>
           </div>
 
           <div class="fg"><label>A quién se le dio / nombre</label><input type="text" id="persona" placeholder="Nombre de la persona" list="personasList" autocomplete="off"><datalist id="personasList"></datalist></div>
@@ -777,15 +781,155 @@ $('bonifFolios').addEventListener('input',()=>{
   }
 });
 
-/* COMPROBANTE EFECTIVALE */
-let efectComp=null;
-$('efectCompZ').addEventListener('click',()=>$('efectCompInput').click());
-$('efectCompInput').addEventListener('change',e=>{
-  const file=e.target.files[0];if(!file)return;
-  if(file.type.startsWith('image/')){comprimirImg(file,d=>{efectComp={tipo:'imagen',data:d,nombre:file.name};$('efectCompImg').src=d;$('efectCompImg').style.display='block';$('efectCompPrev').style.display='block';$('efectCompZ').childNodes[0].textContent='✅ Comprobante listo';});}
-  else if(file.type==='application/pdf'){const r=new FileReader();r.onload=ev=>{efectComp={tipo:'pdf',data:ev.target.result,nombre:file.name};$('efectCompPrev').style.display='block';$('efectCompZ').childNodes[0].textContent='✅ PDF adjunto';};r.readAsDataURL(file);}
+/* ─── EFECTIVALE — PROCESADOR AUTOMÁTICO DE XLS ─── */
+const CATALOGO_TARJETAS={
+  "1755946":{sucursal:"CDMX",tipo:"OPERACIÓN"},"1755947":{sucursal:"CDMX",tipo:"OPERACIÓN"},
+  "1755948":{sucursal:"CDMX",tipo:"OPERACIÓN"},"1755949":{sucursal:"CDMX",tipo:"OPERACIÓN"},
+  "1755950":{sucursal:"CDMX",tipo:"OPERACIÓN"},"1755951":{sucursal:"CDMX",tipo:"OPERACIÓN"},
+  "1755953":{sucursal:"CDMX",tipo:"OPERACIÓN"},"1755954":{sucursal:"CDMX",tipo:"OPERACIÓN"},
+  "1755955":{sucursal:"CDMX",tipo:"OPERACIÓN"},"1755956":{sucursal:"CDMX",tipo:"OPERACIÓN"},
+  "1755957":{sucursal:"CDMX",tipo:"OPERACIÓN"},
+  "1739374":{sucursal:"CDMX",tipo:"VENTAS"},"1739380":{sucursal:"CDMX",tipo:"VENTAS"},
+  "1739381":{sucursal:"CDMX",tipo:"VENTAS"},"1739382":{sucursal:"CDMX",tipo:"VENTAS"},
+  "1739383":{sucursal:"CDMX",tipo:"VENTAS"},"1739384":{sucursal:"CDMX",tipo:"VENTAS"},
+  "1739386":{sucursal:"CDMX",tipo:"VENTAS"},"1739387":{sucursal:"CDMX",tipo:"VENTAS"},
+  "1739388":{sucursal:"CDMX",tipo:"VENTAS"},"1739392":{sucursal:"CDMX",tipo:"VENTAS"},
+  "1739393":{sucursal:"CDMX",tipo:"VENTAS"},
+  "1739394":{sucursal:"Puebla",tipo:"OPERACIÓN"},"1739395":{sucursal:"Puebla",tipo:"OPERACIÓN"},
+  "1739396":{sucursal:"Puebla",tipo:"OPERACIÓN"},"1739397":{sucursal:"Puebla",tipo:"OPERACIÓN"},
+  "1739398":{sucursal:"Puebla",tipo:"OPERACIÓN"},
+  "1739375":{sucursal:"Puebla",tipo:"VENTAS"},"1739390":{sucursal:"Puebla",tipo:"VENTAS"},
+  "1739399":{sucursal:"Puebla",tipo:"VENTAS"},"1739400":{sucursal:"Puebla",tipo:"VENTAS"},
+  "1739401":{sucursal:"Puebla",tipo:"VENTAS"},"1739402":{sucursal:"Puebla",tipo:"VENTAS"},
+  "1739403":{sucursal:"Puebla",tipo:"VENTAS"},"1739404":{sucursal:"Puebla",tipo:"VENTAS"},
+  "1739405":{sucursal:"Morelos",tipo:"OPERACIÓN"},"1739406":{sucursal:"Morelos",tipo:"OPERACIÓN"},
+  "1739407":{sucursal:"Morelos",tipo:"OPERACIÓN"},"1739408":{sucursal:"Morelos",tipo:"OPERACIÓN"},
+  "1739409":{sucursal:"Morelos",tipo:"OPERACIÓN"},"1739410":{sucursal:"Morelos",tipo:"OPERACIÓN"},
+  "1739411":{sucursal:"Morelos",tipo:"OPERACIÓN"},
+  "1739376":{sucursal:"Morelos",tipo:"VENTAS"},"1739378":{sucursal:"Morelos",tipo:"VENTAS"},
+  "1739379":{sucursal:"Morelos",tipo:"VENTAS"},"1739412":{sucursal:"Morelos",tipo:"VENTAS"},
+  "1739413":{sucursal:"Morelos",tipo:"VENTAS"}
+};
+
+let efectRegistros=[];
+
+function leerXLSEfectivale(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'binary'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        const registros=[];
+        // datos empiezan en fila 6 (índice 6), filas impares tienen datos
+        for(let i=6;i<raw.length;i++){
+          const fila=raw[i];
+          if(!fila||!fila[1]||fila[1]==='')continue; // fila vacía
+          const cuenta=String(fila[1]).trim();
+          const fecha=fila[4]?String(fila[4]).substring(0,10):'';
+          const cargo=parseFloat(fila[6])||0;
+          const chofer=String(fila[10]||'').trim();
+          const concepto=String(fila[12]||'').trim();
+          const producto=String(fila[13]||'').trim();
+          const precioLitro=parseFloat(fila[14])||0;
+          const litros=parseFloat(fila[17])||0;
+          if(!cuenta||cargo<=0)continue;
+          const cat=CATALOGO_TARJETAS[cuenta]||{sucursal:'Sin asignar',tipo:'SIN CLASIFICAR'};
+          registros.push({cuenta,fecha,cargo,chofer,concepto,producto,precioLitro,litros,sucursal:cat.sucursal,tipoGasto:cat.tipo});
+        }
+        resolve(registros);
+      }catch(err){reject(err);}
+    };
+    r.onerror=()=>reject(new Error('Error leyendo archivo'));
+    r.readAsBinaryString(file);
+  });
+}
+
+function mostrarResumenEfectivale(){
+  if(!efectRegistros.length){$('efectPreview').style.display='none';$('efectProcesarBtn').style.display='none';return;}
+  const porSuc={};
+  efectRegistros.forEach(r=>{
+    const k=`${r.sucursal}|${r.tipoGasto}`;
+    if(!porSuc[k])porSuc[k]={sucursal:r.sucursal,tipo:r.tipoGasto,registros:0,cargo:0,litros:0};
+    porSuc[k].registros++;porSuc[k].cargo+=r.cargo;porSuc[k].litros+=r.litros;
+  });
+  const sinAsignar=efectRegistros.filter(r=>r.sucursal==='Sin asignar').length;
+  let html=Object.values(porSuc).sort((a,b)=>a.sucursal.localeCompare(b.sucursal)).map(s=>
+    `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);">
+      <span><strong>${s.sucursal}</strong> · ${s.tipo}</span>
+      <span>${fmt(s.cargo)} · ${s.litros.toFixed(1)} L · ${s.registros} reg.</span>
+    </div>`).join('');
+  if(sinAsignar>0)html+=`<div style="color:var(--warn);margin-top:6px;font-size:10px;">⚠ ${sinAsignar} tarjeta(s) sin clasificar en el catálogo — se guardarán como "Sin asignar"</div>`;
+  html+=`<div style="margin-top:8px;font-weight:800;font-size:12px;">Total: ${fmt(efectRegistros.reduce((a,r)=>a+r.cargo,0))} · ${efectRegistros.reduce((a,r)=>a+r.litros,0).toFixed(1)} L · ${efectRegistros.length} registros</div>`;
+  $('efectResumen').innerHTML=html;
+  $('efectPreview').style.display='block';
+  $('efectProcesarBtn').style.display='block';
+}
+
+async function procesarArchivoEfect(inputId,infoId){
+  const file=$(inputId).files[0];
+  if(!file)return;
+  $(infoId).style.display='none';
+  try{
+    const regs=await leerXLSEfectivale(file);
+    // quitar registros previos de este archivo
+    const otroId=inputId==='efect1Input'?'efect2Input':'efect1Input';
+    const otroFile=$(otroId).files[0];
+    let otrosRegs=[];
+    if(otroFile)otrosRegs=efectRegistros.filter(r=>r._archivo!==inputId);
+    regs.forEach(r=>r._archivo=inputId);
+    efectRegistros=[...otrosRegs,...regs];
+    $(infoId).textContent=`✓ ${regs.length} registros leídos`;
+    $(infoId).style.display='block';
+    mostrarResumenEfectivale();
+  }catch(e){$(infoId).textContent='Error al leer el archivo. Verifica que sea el XLS de Efectivale.';$(infoId).style.color='var(--danger)';$(infoId).style.display='block';}
+}
+
+$('efect1Z').addEventListener('click',()=>$('efect1Input').click());
+$('efect2Z').addEventListener('click',()=>$('efect2Input').click());
+$('efect1Input').addEventListener('change',()=>{
+  $('efect1Z').childNodes[0].textContent=`📂 ${$('efect1Input').files[0]?.name||'Subir XLS CDMX'}`;
+  procesarArchivoEfect('efect1Input','efect1Info');
 });
-$('quitarEfectComp').addEventListener('click',()=>{efectComp=null;$('efectCompInput').value='';$('efectCompPrev').style.display='none';$('efectCompImg').src='';$('efectCompZ').childNodes[0].textContent='📎 Subir captura de pantalla o PDF del portal';});
+$('efect2Input').addEventListener('change',()=>{
+  $('efect2Z').childNodes[0].textContent=`📂 ${$('efect2Input').files[0]?.name||'Subir XLS Puebla/Morelos'}`;
+  procesarArchivoEfect('efect2Input','efect2Info');
+});
+
+$('efectProcesarBtn').addEventListener('click',async()=>{
+  if(!efectRegistros.length)return;
+  const btn=$('efectProcesarBtn'),st=$('efectStatus');
+  btn.disabled=true;btn.textContent='Guardando...';st.textContent='';
+  try{
+    const batch=db.batch();
+    const hoy=hoyISO();
+    efectRegistros.forEach(r=>{
+      const ref=db.collection('efectivale').doc();
+      batch.set(ref,{
+        fecha:r.fecha||hoy,cuenta:r.cuenta,sucursal:r.sucursal,
+        tipoGasto:r.tipoGasto,chofer:r.chofer,concepto:r.concepto,
+        producto:r.producto,precioLitro:r.precioLitro,litros:r.litros,
+        cargo:r.cargo,capturista:sesion.user,esEfectivale:true,
+        creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    });
+    await batch.commit();
+    st.textContent=`✓ ${efectRegistros.length} registros guardados correctamente.`;
+    st.style.color='var(--ok)';
+    toast(`Efectivale guardado — ${efectRegistros.length} registros`);
+    efectRegistros=[];
+    $('efect1Input').value='';$('efect2Input').value='';
+    $('efect1Z').childNodes[0].textContent='📂 Subir XLS CDMX';
+    $('efect2Z').childNodes[0].textContent='📂 Subir XLS Puebla/Morelos';
+    $('efect1Info').style.display='none';$('efect2Info').style.display='none';
+    $('efectPreview').style.display='none';$('efectProcesarBtn').style.display='none';
+  }catch(e){
+    st.textContent='Error al guardar. Intenta de nuevo.';st.style.color='var(--danger)';
+  }finally{btn.disabled=false;btn.textContent='✓ Guardar todos los registros en Firebase';}
+});
+
+
 
 /* COMPROBANTE */
 let comp=null,compEd=null;
@@ -839,26 +983,6 @@ $('submitBtn').addEventListener('click',async()=>{
   const autorizado=$('autorizado').value.trim();
   const causaRaiz=$('causaRaiz').value;
   const msg=$('statusMsg'),btn=$('submitBtn');
-
-  // ── VALIDACIONES EFECTIVALE ──
-  if(tipoSel==='Vehículos: gasolina'){
-    const efectSuc=$('efectSucursal').value;
-    const efectMto=parseFloat($('efectMonto').value);
-    if(!efectSuc){msg.textContent='Selecciona la sucursal que recibe la recarga.';msg.className='status-msg err';$('efectSucursal').focus();return;}
-    if(!efectMto||efectMto<=0){msg.textContent='El monto de la recarga es obligatorio.';msg.className='status-msg err';$('efectMonto').focus();return;}
-    const movEfect={fecha:hoyISO(),tipo:'Vehículos: gasolina',esEfectivale:true,sucursal:efectSuc,persona:'Efectivale',concepto:'Recarga Efectivale',monto:efectMto,capturista:sesion.user,autorizado:'',causaRaiz:'',comprobante:efectComp||null,esBonificacion:false};
-    btn.disabled=true;btn.textContent='Guardando...';
-    try{
-      await db.collection('movimientos').add({...movEfect,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
-      toast(`Efectivale registrado: ${efectSuc} · ${fmt(efectMto)}`);
-      msg.textContent='Recarga Efectivale guardada.';msg.className='status-msg ok';
-      $('efectSucursal').value='';$('efectMonto').value='';
-      efectComp=null;$('efectCompInput').value='';$('efectCompPrev').style.display='none';
-      $('efectCompImg').src='';$('efectCompZ').childNodes[0].textContent='📎 Subir captura de pantalla o PDF del portal';
-    }catch(e){msg.textContent='Error al guardar. Verifica tu conexión.';msg.className='status-msg err';}
-    finally{btn.disabled=false;btn.textContent='Registrar movimiento';}
-    return;
-  }
 
   // ── VALIDACIONES BONIFICACIÓN A CLIENTE ──
   if(tipoSel==='Bonificación a cliente'){

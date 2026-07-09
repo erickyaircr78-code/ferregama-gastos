@@ -458,13 +458,17 @@ $('clearBtn').addEventListener('click',()=>{['fSuc','fDesde','fHasta'].forEach(i
 $('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFecha'].forEach(id=>$(id).value='');renderDetalle(filtrar());});
 
 /* FIREBASE */
-let movimientos=[],catalogoFijos=[],estadosFijos={};
+let movimientos=[],catalogoFijos=[],estadosFijos={},efectivaleRegs=[];
 let chartCat=null,chartComp=null;
 function suscribir(){
   db.collection('movimientos').orderBy('creadoEn','desc').onSnapshot(snap=>{
     movimientos=snap.docs.map(d=>({id:d.id,...d.data()}));
     renderTodo();
     analizarAuto();
+  });
+  db.collection('efectivale').orderBy('creadoEn','desc').onSnapshot(snap=>{
+    efectivaleRegs=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderTodo();
   });
   db.collection('fijos_catalogo').onSnapshot(snap=>{catalogoFijos=snap.docs.map(d=>({id:d.id,...d.data()}));renderTodo();});
   db.collection('fijos_estados').doc('global').onSnapshot(doc=>{estadosFijos=doc.exists?doc.data():{};renderTodo();});
@@ -491,9 +495,14 @@ function renderTodo(){
   $('hPendSub').textContent=`${MESES[mesAct]} ${anioAct}`;
 
   // ─── BARRA DE TOTALES CONSOLIDADOS ───
-  const efectivales=f.filter(m=>m.esEfectivale);
-  const totalEfect=efectivales.reduce((a,m)=>a+m.monto,0);
-  const efectPorSuc=['CDMX','Morelos','Puebla'].map(s=>{const v=efectivales.filter(m=>m.sucursal===s).reduce((a,m)=>a+m.monto,0);return v>0?`${s} ${fmt(v)}`:null;}).filter(Boolean);
+  const desde=$('fDesde').value;const hasta=$('fHasta').value;
+  const sucFiltro=$('fSuc').value;
+  let efectFilt=efectivaleRegs;
+  if(desde)efectFilt=efectFilt.filter(r=>r.fecha>=desde);
+  if(hasta)efectFilt=efectFilt.filter(r=>r.fecha<=hasta);
+  if(sucFiltro)efectFilt=efectFilt.filter(r=>r.sucursal===sucFiltro);
+  const totalEfect=efectFilt.reduce((a,r)=>a+r.cargo,0);
+  const efectPorSuc=['CDMX','Morelos','Puebla'].map(s=>{const v=efectFilt.filter(r=>r.sucursal===s).reduce((a,r)=>a+r.cargo,0);return v>0?`${s} ${fmt(v)}`:null;}).filter(Boolean);
   $('totalOpBarra').textContent=fmt(total);
   $('totalOpMovBarra').textContent=`${gastos.length} movimiento${gastos.length!==1?'s':''}`;
   $('totalBonifBarra').textContent=fmt(totalBonif);
