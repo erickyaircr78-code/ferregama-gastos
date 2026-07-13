@@ -657,19 +657,30 @@ function renderTodo(){
 function renderDetalle(base){
   const t=$('dTipo').value,s=$('dSuc').value,fecha=$('dFecha').value;
   const f=base.filter(m=>(!t||m.tipo===t)&&(!s||m.sucursal===s)&&(!fecha||m.fecha===fecha));
+  // agregar Efectivale al detalle
+  const desde=$('fDesde').value;const hasta=$('fHasta').value;const sucF=$('fSuc').value;
+  let efRows=[];
+  if(!t||t==='Vehículos: gasolina'){
+    efRows=efectivaleRegs.filter(r=>{
+      const fe=(r.fecha||'').substring(0,10);
+      return(!sucF||r.sucursal===sucF)&&(!desde||fe>=desde)&&(!hasta||fe<=hasta)&&(!fecha||fe===fecha)&&(!s||r.sucursal===s);
+    }).map(r=>({...r,tipo:'Vehículos: gasolina',monto:r.cargo,persona:r.chofer,concepto:`Efectivale · ${r.producto||''} · ${r.concepto||''}`,comprobante:null,causaRaiz:'',autorizado:'',_esEfect:true}));
+  }
+  const todos=[...f,...efRows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const tb=$('tbDetalle');
-  if(!f.length){tb.innerHTML='<tr class="erow"><td colspan="10">Sin movimientos.</td></tr>';return;}
-  tb.innerHTML=[...f].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(m=>{
+  if(!todos.length){tb.innerHTML='<tr class="erow"><td colspan="10">Sin movimientos.</td></tr>';return;}
+  tb.innerHTML=todos.map(m=>{
     const ts=m.creadoEn?.toDate?m.creadoEn.toDate().toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}):'—';
-    return `<tr>
+    const efBadge=m._esEfect?'<span style="font-size:9px;background:#e6f4eb;color:#2e7d45;padding:1px 5px;border-radius:4px;margin-left:3px;">⛽</span>':'';
+    return `<tr${m._esEfect?' style="background:#f4faf6;"':''}>
       <td>${m.fecha}</td><td style="color:var(--muted);font-size:11px;">${ts}</td>
-      <td><span class="${bdg(m.tipo)}">${m.tipo}</span></td>
+      <td><span class="${bdg(m.tipo)}">${m.tipo}</span>${efBadge}</td>
       <td>${m.sucursal}</td><td>${m.persona||'—'}</td>
-      <td>${m.concepto}${!m.comprobante&&!m.causaRaiz&&m.tipo!=='Bonificación a cliente'?'<span title="Sin comprobante ni causa raíz" style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td>
+      <td>${m.concepto}${!m.comprobante&&!m.causaRaiz&&m.tipo!=='Bonificación a cliente'&&!m._esEfect?'<span title="Sin comprobante ni causa raíz" style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td>
       <td class="ac">${fmt(m.monto)}</td>
       <td>${m.autorizado||'—'}</td>
-      <td>${m.comprobante?'📎':'—'}</td>
-      <td>${m.capturista}</td>
+      <td>${m._esEfect?'⛽':m.comprobante?'📎':'—'}</td>
+      <td>${m.capturista||'claudia'}</td>
     </tr>`;
   }).join('');
 }
