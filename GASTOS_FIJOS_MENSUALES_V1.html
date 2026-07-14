@@ -46,10 +46,17 @@
   .amount-cell{font-weight:700;text-align:right;}
   .empty-row td{text-align:center;color:var(--muted);padding:30px 0;}
 
-  .estado-toggle{display:flex;gap:6px;}
+  .estado-toggle{display:flex;gap:6px;flex-wrap:wrap;}
   .estado-btn{padding:6px 12px;border-radius:14px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--line);background:var(--field);color:var(--muted);}
   .estado-btn.pagado.active{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);}
   .estado-btn.pendiente.active{background:var(--pend-bg);border-color:var(--pend-text);color:var(--pend-text);}
+  .estado-btn.parcial.active{background:#fff3d6;border-color:#c07a00;color:#c07a00;}
+  .abono-wrap{margin-top:8px;display:none;background:#f4f2eb;border-radius:8px;padding:10px 12px;border:1.5px solid #e2ddd4;}
+  .abono-wrap.show{display:block;}
+  .saldo-badge{display:inline-block;padding:3px 8px;border-radius:8px;font-size:11px;font-weight:700;}
+  .saldo-ok{background:var(--ok-bg);color:var(--ok);}
+  .saldo-warn{background:#fff3d6;color:#c07a00;}
+  .saldo-pend{background:var(--pend-bg);color:var(--pend-text);}
 
   .icon-btn{border:none;background:transparent;cursor:pointer;font-size:13px;color:var(--muted);padding:4px 7px;border-radius:6px;}
   .icon-btn:hover{background:var(--field);color:var(--accent);}
@@ -496,11 +503,72 @@ async function eliminarConcepto(id) {
 
 async function toggleEstado(id, valor) {
   try {
-    await guardarEstadoDB(claveEstado(id), valor);
+    if(valor==='abono'){
+      // mostrar campo de abono
+      const wrap=document.getElementById(`abono-${id}`);
+      if(wrap) wrap.classList.toggle('show');
+      return;
+    }
+    // si es pagado completo, guardar el monto total como pagado
+    const concepto=catalogoFijos.find(c=>c.id===id);
+    const datos={estado:valor,pagado:valor==='pagado'?(concepto?concepto.monto:0):0,fecha:new Date().toISOString().split('T')[0]};
+    await guardarEstadoDB(claveEstado(id), datos);
+    if(valor==='pagado'&&concepto){
+      await db.collection('movimientos').add({
+        fecha:new Date().toISOString().split('T')[0],
+        tipo:'Gastos fijos',
+        sucursal:concepto.sucursal||'CDMX',
+        persona:'',
+        concepto:`Pago fijo: ${concepto.concepto}`,
+        monto:concepto.monto,
+        capturista:'claudia',
+        autorizado:'',
+        causaRaiz:'',
+        comprobante:null,
+        esBonificacion:false,
+        esFijo:true,
+        creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+      });
+    }
+    mostrarToast(valor==='pagado'?'✓ Marcado como pagado':'Marcado como pendiente');
   } catch (err) {
     console.error(err);
     mostrarToast("Error al actualizar estado. Verifica tu conexión.");
   }
+}
+
+async function registrarAbono(id) {
+  const input=document.getElementById(`monto-abono-${id}`);
+  const monto=parseFloat(input.value)||0;
+  if(!monto||monto<=0){mostrarToast('Escribe el monto del abono');return;}
+  const concepto=catalogoFijos.find(c=>c.id===id);
+  const estadoActual=estados[claveEstado(id)]||{estado:'pendiente',pagado:0};
+  const pagadoAnterior=typeof estadoActual==='string'?0:(estadoActual.pagado||0);
+  const nuevoPagado=pagadoAnterior+monto;
+  const total=concepto?concepto.monto:0;
+  const nuevoEstado=nuevoPagado>=total?'pagado':'parcial';
+  try{
+    await guardarEstadoDB(claveEstado(id),{estado:nuevoEstado,pagado:nuevoPagado,fecha:new Date().toISOString().split('T')[0]});
+    // registrar en movimientos para que aparezca en el dashboard
+    await db.collection('movimientos').add({
+      fecha:new Date().toISOString().split('T')[0],
+      tipo:'Gastos fijos',
+      sucursal:concepto?concepto.sucursal:'CDMX',
+      persona:'',
+      concepto:`Abono fijo: ${concepto?concepto.concepto:''}`,
+      monto:monto,
+      capturista:'claudia',
+      autorizado:'',
+      causaRaiz:'',
+      comprobante:null,
+      esBonificacion:false,
+      esFijo:true,
+      creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    input.value='';
+    document.getElementById(`abono-${id}`).classList.remove('show');
+    mostrarToast(nuevoEstado==='pagado'?`✓ Pagado completo: ${fmt(nuevoPagado)}`:`Abono registrado: ${fmt(monto)} · Pendiente: ${fmt(total-nuevoPagado)}`);
+  }catch(err){mostrarToast('Error al registrar abono');}
 }
 
 function renderTodo() {
@@ -513,20 +581,35 @@ function renderTodo() {
     tbody.innerHTML = `<tr class="empty-row"><td colspan="6">No hay pagos fijos en el catálogo todavía.</td></tr>`;
   } else {
     tbody.innerHTML = catalogo.map(c => {
-      const estado = estados[claveEstado(c.id)] || 'pendiente';
-      totalMes += c.monto;
-      if (estado === 'pagado') totalPagado += c.monto; else totalPendiente += c.monto;
+      const estadoObj=estados[claveEstado(c.id)]||{estado:'pendiente',pagado:0};
+      const estadoVal=typeof estadoObj==='string'?estadoObj:(estadoObj.estado||'pendiente');
+      const pagadoMonto=typeof estadoObj==='string'?0:(estadoObj.pagado||0);
+      const saldo=c.monto-pagadoMonto;
+      totalMes+=c.monto;
+      if(estadoVal==='pagado') totalPagado+=c.monto;
+      else if(estadoVal==='parcial'){totalPagado+=pagadoMonto;totalPendiente+=saldo;}
+      else totalPendiente+=c.monto;
+      const saldoBadge=estadoVal==='pagado'?`<span class="saldo-badge saldo-ok">✓ Pagado completo</span>`:estadoVal==='parcial'?`<span class="saldo-badge saldo-warn">Abonado ${formatoMoneda(pagadoMonto)} &middot; Saldo ${formatoMoneda(saldo)}</span>`:`<span class="saldo-badge saldo-pend">Pendiente</span>`;
       return `
         <tr>
           <td>${c.concepto}</td>
           <td>${c.sucursal}</td>
-          <td>${c.dia ? 'Día ' + c.dia : '—'}</td>
+          <td>${c.dia?'Día '+c.dia:'—'}</td>
           <td class="amount-cell">${formatoMoneda(c.monto)}</td>
           <td>
             <div class="estado-toggle">
-              <button class="estado-btn pagado ${estado === 'pagado' ? 'active' : ''}" onclick="toggleEstado('${c.id}','pagado')">Pagado</button>
-              <button class="estado-btn pendiente ${estado === 'pendiente' ? 'active' : ''}" onclick="toggleEstado('${c.id}','pendiente')">Pendiente</button>
+              <button class="estado-btn pagado ${estadoVal==='pagado'?'active':''}" onclick="toggleEstado('${c.id}','pagado')">✓ Pagado</button>
+              <button class="estado-btn parcial ${estadoVal==='parcial'?'active':''}" onclick="toggleEstado('${c.id}','abono')">+ Abono</button>
+              <button class="estado-btn pendiente ${estadoVal==='pendiente'?'active':''}" onclick="toggleEstado('${c.id}','pendiente')">Pendiente</button>
             </div>
+            <div class="abono-wrap" id="abono-${c.id}">
+              <div style="font-size:11px;font-weight:700;color:#8a857a;margin-bottom:6px;">Total: ${formatoMoneda(c.monto)} &middot; Pagado: ${formatoMoneda(pagadoMonto)} &middot; Saldo: ${formatoMoneda(saldo)}</div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input type="number" id="monto-abono-${c.id}" placeholder="Monto del abono" step="0.01" style="flex:1;padding:7px 10px;border:1.5px solid #e2ddd4;border-radius:7px;font-size:13px;font-family:inherit;">
+                <button onclick="registrarAbono('${c.id}')" style="padding:7px 14px;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">Guardar abono</button>
+              </div>
+            </div>
+            <div style="margin-top:5px;">${saldoBadge}</div>
           </td>
           <td><button class="icon-btn" onclick="eliminarConcepto('${c.id}')" title="Eliminar del catálogo">✕</button></td>
         </tr>
@@ -541,14 +624,21 @@ function renderTodo() {
 
 document.getElementById('exportBtn').addEventListener('click', () => {
   if (!catalogo.length) { mostrarToast("No hay datos para exportar"); return; }
-  const datos = catalogo.map(c => ({
-    Mes: `${MESES[mesActual]} ${anioActual}`,
-    Concepto: c.concepto,
-    Sucursal: c.sucursal,
-    'Día de pago': c.dia || '',
-    Monto: c.monto,
-    Estado: (estados[claveEstado(c.id)] || 'pendiente')
-  }));
+  const datos = catalogo.map(c => {
+    const estadoObj=estados[claveEstado(c.id)]||{estado:'pendiente',pagado:0};
+    const estadoVal=typeof estadoObj==='string'?estadoObj:(estadoObj.estado||'pendiente');
+    const pagadoMonto=typeof estadoObj==='string'?0:(estadoObj.pagado||0);
+    return {
+      Mes: `${MESES[mesActual]} ${anioActual}`,
+      Concepto: c.concepto,
+      Sucursal: c.sucursal,
+      'Día de pago': c.dia || '',
+      'Monto total': c.monto,
+      'Pagado': pagadoMonto,
+      'Saldo pendiente': c.monto-pagadoMonto,
+      Estado: estadoVal
+    };
+  });
   const ws = XLSX.utils.json_to_sheet(datos);
   ws['!cols'] = [{wch:16},{wch:22},{wch:12},{wch:12},{wch:12},{wch:12}];
   const wb = XLSX.utils.book_new();
