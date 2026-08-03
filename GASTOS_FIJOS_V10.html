@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gastos Fijos v10 · Ferregama</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --ink:#1a1714;--muted:#6a6560;--paper:#f4f2eb;--card:#ffffff;
+  --line:#e2ddd4;--field:#f8f6f0;--accent:#b5482a;
+  --ok:#2e7d45;--ok-bg:#e6f4eb;--warn:#c07a00;--warn-bg:#fff3d6;
+  --danger:#c0392b;--danger-bg:#fdecea;
+  --cdmx:#1F4E79;--cdmx-bg:#DEEAF1;
+  --morelos:#375623;--morelos-bg:#E2EFDA;
+  --puebla:#7B2C2C;--puebla-bg:#FCE4D6;
+  --admin:#5a2d9c;--admin-bg:#f0e8fc;
+  --font:'Segoe UI',system-ui,sans-serif;
+}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);-webkit-font-smoothing:antialiased;}
+
+/* LOGIN */
+.login-ov{position:fixed;inset:0;background:radial-gradient(circle at 30% 20%,#1e3028,#141c18);display:flex;align-items:center;justify-content:center;z-index:300;}
+.login-box{background:#fff;border-radius:16px;padding:36px 32px;width:100%;max-width:380px;box-shadow:0 8px 40px rgba(0,0,0,.3);}
+.login-logo{font-size:32px;text-align:center;margin-bottom:8px;}
+.login-box h1{font-size:18px;font-weight:800;text-align:center;margin-bottom:4px;}
+.login-box p{font-size:12px;color:var(--muted);text-align:center;margin-bottom:24px;}
+.ml{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:5px;}
+.mi{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;font-family:var(--font);background:var(--field);color:var(--ink);margin-bottom:14px;}
+.mi:focus{outline:none;border-color:var(--accent);}
+.btn-login{width:100%;padding:12px;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.login-err{color:var(--danger);font-size:12px;margin-top:8px;text-align:center;display:none;}
+
+/* TOPBAR */
+.topbar{background:#141c18;color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:52px;position:sticky;top:0;z-index:100;}
+.topbar-left{font-size:13px;}
+.topbar-left strong{font-size:15px;font-weight:800;}
+.topbar-right{display:flex;align-items:center;gap:10px;}
+.badge-suc{padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700;}
+.badge-cdmx{background:var(--cdmx-bg);color:var(--cdmx);}
+.badge-morelos{background:var(--morelos-bg);color:var(--morelos);}
+.badge-puebla{background:var(--puebla-bg);color:var(--puebla);}
+.badge-admin{background:var(--admin-bg);color:var(--admin);}
+.btn-top{background:rgba(255,255,255,.12);border:none;color:#fff;padding:6px 12px;border-radius:8px;font-size:12px;cursor:pointer;font-family:var(--font);}
+
+/* NAV */
+.nav{display:flex;gap:6px;padding:14px 20px 0;}
+.nav-btn{padding:8px 18px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--line);background:var(--field);color:var(--muted);font-family:var(--font);}
+.nav-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+
+/* MES NAV */
+.mes-nav{display:flex;align-items:center;justify-content:center;gap:12px;padding:12px 20px 0;}
+.mes-btn{background:none;border:1.5px solid var(--line);border-radius:8px;padding:5px 12px;font-size:13px;cursor:pointer;font-family:var(--font);}
+.mes-btn:hover{border-color:var(--accent);color:var(--accent);}
+.mes-titulo{font-size:15px;font-weight:800;min-width:150px;text-align:center;}
+
+.wrap{max-width:900px;margin:0 auto;padding:16px 20px 40px;}
+.view{display:none;}
+.view.active{display:block;}
+
+/* SECCIÓN TIPOS */
+.section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+.sec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:10px;}
+.divider{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:12px 0 8px;padding-top:10px;border-top:1px solid var(--line);}
+
+/* BOTONES DE TIPO */
+.tipos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;}
+.tipo-btn{padding:10px 8px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--field);color:var(--ink);text-align:center;font-family:var(--font);line-height:1.3;}
+.tipo-btn:hover{border-color:var(--accent);color:var(--accent);}
+.tipo-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.tipo-btn.corp{border-style:dashed;color:var(--muted);font-size:11px;}
+.tipo-btn.corp.active{background:var(--admin-bg);border-color:var(--admin);color:var(--admin);border-style:solid;}
+.tipo-btn.semanal.active{background:var(--warn-bg);border-color:var(--warn);color:var(--warn);}
+.sub-lbl{font-size:9px;color:var(--muted);display:block;margin-top:2px;font-weight:400;}
+.tipo-btn.active .sub-lbl{color:rgba(255,255,255,.7);}
+.tipo-btn.corp.active .sub-lbl{color:var(--admin);}
+.tipo-btn.semanal.active .sub-lbl{color:var(--warn);}
+
+/* ZONA SELECTOR */
+.zona-wrap{display:none;margin-top:10px;}
+.zona-wrap.show{display:flex;gap:6px;}
+.zona-btn{flex:1;padding:8px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--field);color:var(--muted);text-align:center;font-family:var(--font);}
+.zona-btn.active-cdmx{background:var(--cdmx-bg);border-color:var(--cdmx);color:var(--cdmx);}
+.zona-btn.active-morelos{background:var(--morelos-bg);border-color:var(--morelos);color:var(--morelos);}
+.zona-btn.active-puebla{background:var(--puebla-bg);border-color:var(--puebla);color:var(--puebla);}
+.zona-btn.active-general{background:var(--admin-bg);border-color:var(--admin);color:var(--admin);}
+
+/* CONCEPTO LABEL */
+.concepto-label{background:var(--field);border-radius:8px;padding:10px 14px;font-size:13px;margin-bottom:14px;display:none;}
+.concepto-label.show{display:flex;align-items:center;gap:8px;}
+.concepto-label strong{font-weight:700;}
+.pill-semanal{background:var(--warn-bg);color:var(--warn);font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+
+/* FORM */
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+.fg{display:flex;flex-direction:column;gap:4px;}
+.fg label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.fg input,.fg select,.fg textarea{padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);color:var(--ink);}
+.fg input:focus,.fg select:focus,.fg textarea:focus{outline:none;border-color:var(--accent);}
+.comp-zone{border:2px dashed var(--line);border-radius:8px;padding:12px;text-align:center;cursor:pointer;font-size:12px;color:var(--muted);background:var(--field);}
+.comp-zone:hover{border-color:var(--accent);color:var(--accent);}
+.comp-prev{max-width:100%;max-height:100px;border-radius:6px;margin-top:6px;display:none;}
+.causa-wrap{display:none;margin-top:8px;}
+.causa-wrap.show{display:block;}
+.btn-guardar{padding:11px 24px;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);margin-top:12px;}
+.btn-sec{padding:8px 16px;background:var(--field);border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);color:var(--ink);}
+.form-err{color:var(--danger);font-size:12px;margin-top:8px;display:none;}
+
+/* TABLA */
+.tabla-card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px;}
+.tabla-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);}
+.tabla-header h3{font-size:13px;font-weight:800;}
+table{width:100%;border-collapse:collapse;}
+th{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:9px 14px;text-align:left;border-bottom:1px solid var(--line);background:var(--field);}
+td{padding:10px 14px;font-size:12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:#fafaf8;}
+.chip{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;}
+.chip-cdmx{background:var(--cdmx-bg);color:var(--cdmx);}
+.chip-morelos{background:var(--morelos-bg);color:var(--morelos);}
+.chip-puebla{background:var(--puebla-bg);color:var(--puebla);}
+.chip-general{background:#f0f0f0;color:#555;}
+.chip-ok{background:var(--ok-bg);color:var(--ok);}
+.ibtn{background:none;border:none;cursor:pointer;font-size:13px;padding:3px 6px;border-radius:5px;color:var(--muted);}
+.ibtn:hover{background:var(--field);color:var(--accent);}
+
+/* KPIs */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px;}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;}
+.kpi-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:4px;}
+.kpi-val{font-size:20px;font-weight:800;}
+
+/* CATÁLOGO */
+.cat-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--field);}
+
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--ink);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:500;transition:transform .3s;pointer-events:none;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+
+/* EMPTY */
+.empty{text-align:center;padding:32px;color:var(--muted);font-size:13px;}
+.abono-wrap{display:none;margin-top:6px;}
+.abono-wrap.show{display:flex;gap:6px;align-items:center;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-ov" id="loginOv">
+  <div class="login-box">
+    <div class="login-logo">📋</div>
+    <h1>Gastos Fijos</h1>
+    <p>Ferregama · Gastos Fijos v10</p>
+    <div class="ml">Usuario</div>
+    <input class="mi" type="text" id="loginUser" placeholder="Tu usuario" autocomplete="username">
+    <div class="ml">Contraseña</div>
+    <input class="mi" type="password" id="loginPass" placeholder="Contraseña" autocomplete="current-password">
+    <button class="btn-login" onclick="doLogin()">Entrar</button>
+    <div class="login-err" id="loginErr">Usuario o contraseña incorrectos</div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar" id="topbar" style="display:none;">
+  <div class="topbar-left">
+    <div style="font-size:10px;color:#9eb8a8;text-transform:uppercase;letter-spacing:.08em;">Ferregama · Gastos Fijos</div>
+    <strong id="mesTituloTop">—</strong>
+  </div>
+  <div class="topbar-right">
+    <span class="badge-suc" id="sucBadge"></span>
+    <span style="font-size:12px;color:#9eb8a8;" id="userBadge"></span>
+    <button class="btn-top" onclick="cerrarSesion()">Salir</button>
+  </div>
+</div>
+
+<!-- CONTENIDO -->
+<div id="mainWrap" style="display:none;">
+
+  <div class="mes-nav">
+    <button class="mes-btn" onclick="cambiarMes(-1)">‹</button>
+    <div class="mes-titulo" id="mesTitulo">—</div>
+    <button class="mes-btn" onclick="cambiarMes(1)">›</button>
+  </div>
+
+  <div class="nav" style="padding:14px 20px 0;">
+    <button class="nav-btn active" data-tab="captura" onclick="showTab('captura',this)">Capturar</button>
+    <button class="nav-btn" data-tab="lista" onclick="showTab('lista',this)">Pagos del mes</button>
+    <button class="nav-btn" data-tab="catalogo" id="tabCatalogo" style="display:none;" onclick="showTab('catalogo',this)">Catálogo</button>
+  </div>
+
+  <div class="wrap">
+
+    <!-- TAB CAPTURA -->
+    <div id="viewCaptura" class="view active">
+
+      <div class="section">
+        <div class="sec-title">Tipo de gasto fijo</div>
+
+        <div class="divider" style="margin-top:0;padding-top:0;border-top:none;">Nómina y personal</div>
+        <div class="tipos-grid" id="gridNomina"></div>
+        <div class="zona-wrap" id="zonaNomina"></div>
+
+        <div class="divider">Servicios</div>
+        <div class="tipos-grid" id="gridServicios"></div>
+        <div class="zona-wrap" id="zonaServicios"></div>
+
+        <div class="divider" id="divCorp" style="display:none;">Corporativos</div>
+        <div class="tipos-grid" id="gridCorp" style="display:none;"></div>
+      </div>
+
+      <div class="concepto-label" id="conceptoLabel">
+        <span>Capturando:</span>
+        <strong id="conceptoNombre">—</strong>
+        <span class="pill-semanal" id="semanalPill" style="display:none;">semanal</span>
+      </div>
+
+      <div class="section" id="formSection" style="display:none;">
+        <div class="form-grid">
+          <div class="fg">
+            <label>Monto pagado *</label>
+            <input type="number" id="fMonto" placeholder="0.00" step="0.01" min="0.01">
+          </div>
+          <div class="fg">
+            <label>Fecha de pago *</label>
+            <input type="date" id="fFecha">
+          </div>
+        </div>
+        <div style="margin-bottom:10px;">
+          <div class="ml">Comprobante</div>
+          <div class="comp-zone" id="compZone" onclick="document.getElementById('compInput').click()">
+            📎 Toca para adjuntar foto o PDF
+            <input type="file" id="compInput" accept="image/*,.pdf" style="display:none;">
+          </div>
+          <img id="compPrev" class="comp-prev">
+          <div id="compNombre" style="font-size:11px;color:var(--ok);margin-top:4px;"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+            <input type="checkbox" id="sinComp" style="width:16px;height:16px;" onchange="toggleCausa()">
+            <label for="sinComp" style="font-size:12px;font-weight:600;cursor:pointer;">Sin comprobante — explica por qué</label>
+          </div>
+          <div class="causa-wrap" id="causaWrap">
+            <div class="ml" style="margin-top:8px;">Causa raíz *</div>
+            <textarea id="fCausa" rows="2" placeholder="¿Por qué no hay comprobante?"></textarea>
+          </div>
+        </div>
+        <div class="form-err" id="formErr"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn-guardar" onclick="guardarPago()">Guardar pago fijo</button>
+          <button class="btn-sec" onclick="limpiarForm()">Limpiar</button>
+          <span id="guardandoMsg" style="font-size:12px;color:var(--muted);display:none;">Guardando...</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- TAB LISTA -->
+    <div id="viewLista" class="view">
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="tabla-card">
+        <div class="tabla-header">
+          <h3>Pagos registrados</h3>
+          <div style="display:flex;gap:8px;">
+            <input type="text" id="busqueda" placeholder="🔍 Buscar..." style="padding:6px 10px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--field);width:140px;" oninput="renderLista()">
+            <select id="filtroSuc" style="padding:6px 10px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;font-family:var(--font);background:var(--field);" onchange="renderLista()">
+              <option value="">Todas</option>
+              <option value="CDMX">CDMX</option>
+              <option value="Morelos">Morelos</option>
+              <option value="Puebla">Puebla</option>
+              <option value="General">General</option>
+            </select>
+            <button class="btn-sec" onclick="exportarExcel()">⬇ Excel</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th><th>Concepto</th><th>Sucursal</th>
+                <th>Capturó</th><th>Comp.</th><th style="text-align:right;">Monto</th><th></th>
+              </tr>
+            </thead>
+            <tbody id="tbPagos"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB CATÁLOGO -->
+    <div id="viewCatalogo" class="view">
+      <div class="section">
+        <div class="sec-title">Agregar concepto al catálogo</div>
+        <p id="notaCat" style="font-size:11px;color:var(--muted);margin-bottom:12px;"></p>
+        <div style="display:flex;gap:8px;margin-bottom:16px;">
+          <input type="text" id="nuevoConc" placeholder="Nombre del concepto..." style="flex:1;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
+          <button class="btn-guardar" style="margin:0;" onclick="agregarConcepto()">Agregar</button>
+        </div>
+        <div id="listaCatalogo"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",
+  authDomain:"ferregama-gastos.firebaseapp.com",
+  projectId:"ferregama-gastos",
+  storageBucket:"ferregama-gastos.appspot.com",
+  messagingSenderId:"561677307493",
+  appId:"1:561677307493:web:ferregamagastos"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+
+const $=id=>document.getElementById(id);
+const fmt=n=>new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(n||0);
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3000);}
+function hoyISO(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+// ── ESTADO ──
+let sesion=null;
+let mesAct=new Date().getMonth();
+let anioAct=new Date().getFullYear();
+let pagos=[];
+let catalogo=[];
+let estadosFijos={};
+let compFile=null;
+let tipoSel=null;
+let zonaSel=null;
+let conceptoFinal=null;
+let editandoId=null;
+
+// Usuarios que NO necesitan selector de zona (su zona es automática)
+function esSoloZona(){return sesion&&sesion.rol==='capturista'&&sesion.sucursal&&sesion.sucursal!=='todas';}
+function miZona(){return sesion?sesion.sucursal:'';}
+function esAdmin(){return sesion&&(sesion.rol==='admin'||sesion.user==='erick');}
+
+// Conceptos que necesitan selector de zona
+const CON_ZONA=['Nómina','Bonos','Préstamo caja chica','Agua','Luz','Telmex','Total Play','Seguros','Renta de local','Renta impresoras','Cuotas mantenimiento'];
+// Conceptos semanales (permiten múltiples en el mes)
+const SEMANALES=['Casanova Rent','Gastos legales','Gasolina personal ventas','Nómina','Bonos','Préstamo caja chica'];
+// Corporativos solo Claudia/Admin
+const CORPORATIVOS=['EBRO','Hipotecario Banorte','Casanova Rent','Unirenta','Nissan','Santrack','Hand Held','ADT','Gastos legales','Gasolina personal ventas','Honorarios fijos','Timbres para facturar','Licencias Microsip','Imprenta','Cuota sindical','Verificaciones camionetas','Verificaciones automóviles','Tenencia camionetas','Tenencia automóviles'];
+
+// ── LOGIN ──
+$('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+async function doLogin(){
+  const u=$('loginUser').value.trim().toLowerCase();
+  const p=$('loginPass').value;
+  if(!u||!p){$('loginErr').textContent='Completa usuario y contraseña.';$('loginErr').style.display='block';return;}
+  $('loginErr').style.display='none';
+  const btn=$('loginOv').querySelector('button');
+  btn.disabled=true;btn.textContent='Verificando...';
+  try{
+    const doc=await db.collection('usuarios').doc(u).get();
+    if(!doc.exists||doc.data().pass!==p||doc.data().estado==='inactivo'){
+      $('loginErr').textContent='Usuario o contraseña incorrectos.';
+      $('loginErr').style.display='block';btn.disabled=false;btn.textContent='Entrar';return;
+    }
+    const data=doc.data();
+    if(data.rol==='viewer'){
+      $('loginErr').textContent='No tienes acceso a esta sección.';
+      $('loginErr').style.display='block';btn.disabled=false;btn.textContent='Entrar';return;
+    }
+    sesion={user:u,rol:data.rol,sucursal:data.sucursal||''};
+    sessionStorage.setItem('fgv10_ses',JSON.stringify(sesion));
+    db.collection('usuarios').doc(u).update({ultimoAcceso:firebase.firestore.FieldValue.serverTimestamp()}).catch(()=>{});
+    iniciarSesion();
+  }catch(e){
+    $('loginErr').textContent='Error de conexión.';
+    $('loginErr').style.display='block';btn.disabled=false;btn.textContent='Entrar';
+  }
+}
+
+function cerrarSesion(){sessionStorage.removeItem('fgv10_ses');location.reload();}
+
+function iniciarSesion(){
+  $('loginOv').style.display='none';
+  $('topbar').style.display='flex';
+  $('mainWrap').style.display='block';
+  // Badge
+  const bc=sesion.rol==='admin'?'badge-admin':
+    sesion.sucursal==='CDMX'?'badge-cdmx':
+    sesion.sucursal==='Morelos'?'badge-morelos':'badge-puebla';
+  $('sucBadge').className='badge-suc '+bc;
+  $('sucBadge').textContent=esAdmin()?'Admin':sesion.sucursal;
+  $('userBadge').textContent=sesion.user;
+  // Tab catálogo visible para todos
+  $('tabCatalogo').style.display='inline-block';
+  // Nota catálogo
+  $('notaCat').textContent=esSoloZona()?
+    `Puedes agregar conceptos de tu zona (${miZona()}). El nombre debe incluir la zona. Ej: "Gas ${miZona()}".`:
+    'Agrega o elimina conceptos del catálogo. Aplica para todos los usuarios.';
+  // Fecha de hoy
+  $('fFecha').value=hoyISO();
+  // Construir botones
+  construirBotones();
+  // Mes
+  actualizarMes();
+  // Suscribir
+  suscribir();
+}
+
+// Sesión guardada
+const sesSaved=sessionStorage.getItem('fgv10_ses');
+if(sesSaved){sesion=JSON.parse(sesSaved);iniciarSesion();}
+
+// ── MES ──
+function actualizarMes(){
+  const txt=`${MESES[mesAct]} ${anioAct}`;
+  $('mesTitulo').textContent=txt;
+  $('mesTituloTop').textContent=txt;
+}
+function cambiarMes(d){
+  if(d===-1){if(mesAct===0){mesAct=11;anioAct--;}else mesAct--;}
+  else{if(mesAct===11){mesAct=0;anioAct++;}else mesAct++;}
+  actualizarMes();renderLista();renderKPIs();
+}
+
+// ── TABS ──
+function showTab(tab,btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  $('view'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
+  btn.classList.add('active');
+  if(tab==='lista'){renderLista();renderKPIs();}
+  if(tab==='catalogo')renderCatalogo();
+}
+
+// ── CONSTRUCCIÓN DE BOTONES ──
+function construirBotones(){
+  // Nómina y personal
+  const nomina=[
+    {concepto:'Nómina',conZona:true},
+    {concepto:'Bonos',conZona:true},
+    {concepto:'Préstamo caja chica',conZona:true},
+  ];
+  $('gridNomina').innerHTML=nomina.map(t=>btnHTML(t)).join('');
+
+  // Servicios por zona
+  const servicios=[
+    {concepto:'Agua',conZona:true},
+    {concepto:'Luz',conZona:true},
+    {concepto:'Telmex',conZona:true},
+    {concepto:'Total Play',conZona:true},
+    {concepto:'Telcel',conZona:esAdmin()||sesion.user==='claudia',subLbl:esAdmin()?'↓ zona':'solo Claudia'},
+    {concepto:'Alarma CDMX',conZona:false},
+    {concepto:'Fumigación CDMX',conZona:false},
+    {concepto:'Seguros',conZona:true},
+    {concepto:'Renta de local',conZona:true},
+    {concepto:'Renta impresoras',conZona:true},
+    {concepto:'Cuotas mantenimiento',conZona:true},
+  ];
+  $('gridServicios').innerHTML=servicios.map(t=>btnHTML(t)).join('');
+
+  // Corporativos solo admin/claudia
+  if(esAdmin()||sesion.user==='claudia'){
+    $('divCorp').style.display='block';
+    $('gridCorp').style.display='grid';
+    const corp=[
+      {concepto:'EBRO',corp:true},
+      {concepto:'Hipotecario Banorte',corp:true},
+      {concepto:'Casanova Rent',corp:true,semanal:true},
+      {concepto:'Unirenta',corp:true},
+      {concepto:'Nissan',corp:true},
+      {concepto:'Santrack',corp:true},
+      {concepto:'Hand Held',corp:true},
+      {concepto:'ADT',corp:true},
+      {concepto:'Gastos legales',corp:true,semanal:true},
+      {concepto:'Gasolina personal ventas',corp:true,semanal:true},
+      {concepto:'Honorarios fijos',corp:true},
+      {concepto:'Timbres para facturar',corp:true},
+      {concepto:'Licencias Microsip',corp:true},
+      {concepto:'Imprenta',corp:true},
+      {concepto:'Cuota sindical',corp:true},
+    ];
+    $('gridCorp').innerHTML=corp.map(t=>btnHTML(t)).join('');
+  }
+
+  // Selector de zona para nómina/servicios
+  $('zonaNomina').innerHTML=zonaHTML('zonaNomina');
+  $('zonaServicios').innerHTML=zonaHTML('zonaServicios');
+}
+
+function btnHTML(t){
+  const cls=['tipo-btn',t.corp?'corp':'',t.semanal?'semanal':''].filter(Boolean).join(' ');
+  const sub=t.semanal?'semanal':t.conZona?'↓ zona':(t.subLbl||'');
+  return`<button class="${cls}" onclick="selTipo('${t.concepto}',${!!t.conZona},'${t.corp?'corp':t.semanal?'semanal':''}')">${t.concepto}${sub?`<span class="sub-lbl">${sub}</span>`:''}</button>`;
+}
+
+function zonaHTML(id){
+  const btnStyle='padding:8px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--field);color:var(--muted);font-family:var(--font);flex:1;text-align:center;';
+  if(esSoloZona()){
+    return`<button style="${btnStyle}background:var(--cdmx-bg);border-color:var(--cdmx);color:var(--cdmx);" onclick="selZona(this,'${miZona()}','${id}')">${miZona()} ✓</button>`;
+  }
+  const zonas=['CDMX','Morelos','Puebla','General'];
+  return zonas.map(z=>
+    `<button class="zona-btn" style="${btnStyle}" onclick="selZona(this,'${z}','${id}')">${z}</button>`
+  ).join('');
+}
+
+// ── SELECCIÓN DE TIPO ──
+function selTipo(concepto,conZona,tipoCls){
+  // Deseleccionar todos
+  document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
+  // Seleccionar el presionado
+  document.querySelectorAll('.tipo-btn').forEach(b=>{
+    if(b.textContent.trim().startsWith(concepto))b.classList.add('active');
+  });
+  tipoSel=concepto;
+  zonaSel=null;
+  // Mostrar zona si aplica
+  $('zonaNomina').classList.remove('show');
+  $('zonaServicios').classList.remove('show');
+  if(conZona){
+    // ¿Es de nómina o servicios?
+    const enNomina=['Nómina','Bonos','Préstamo caja chica'].includes(concepto);
+    const wrap=enNomina?$('zonaNomina'):$('zonaServicios');
+    wrap.classList.add('show');
+    // Si capturista solo tiene una zona, seleccionarla automáticamente
+    if(esSoloZona()){
+      const btn=wrap.querySelector('.zona-btn');
+      if(btn){selZona(btn,miZona(),wrap.id);}
+    }else{
+      // Limpiar selección previa
+      wrap.querySelectorAll('.zona-btn').forEach(b=>b.className='zona-btn');
+      conceptoFinal=null;
+      actualizarLabel();
+      return;
+    }
+  }else{
+    // Sin zona — concepto directo
+    conceptoFinal=concepto;
+  }
+  actualizarLabel();
+}
+
+function selZona(btn,zona,wrapId){
+  const wrap=$(wrapId);
+  const btnStyle='padding:8px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--field);color:var(--muted);font-family:var(--font);flex:1;text-align:center;';
+  const actStyle=zona==='CDMX'?'padding:8px 14px;border:1.5px solid var(--cdmx);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--cdmx-bg);color:var(--cdmx);font-family:var(--font);flex:1;text-align:center;':
+    zona==='Morelos'?'padding:8px 14px;border:1.5px solid var(--morelos);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--morelos-bg);color:var(--morelos);font-family:var(--font);flex:1;text-align:center;':
+    zona==='Puebla'?'padding:8px 14px;border:1.5px solid var(--puebla);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--puebla-bg);color:var(--puebla);font-family:var(--font);flex:1;text-align:center;':
+    'padding:8px 14px;border:1.5px solid var(--admin);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--admin-bg);color:var(--admin);font-family:var(--font);flex:1;text-align:center;';
+  wrap.querySelectorAll('button').forEach(b=>{b.style.cssText=btnStyle;});
+  btn.style.cssText=actStyle;
+  zonaSel=zona;
+  conceptoFinal=`${tipoSel} ${zona}`;
+  actualizarLabel();
+}
+
+function actualizarLabel(){
+  if(!tipoSel){$('conceptoLabel').classList.remove('show');$('formSection').style.display='none';return;}
+  if(CON_ZONA.includes(tipoSel)&&!zonaSel){$('conceptoLabel').classList.remove('show');$('formSection').style.display='none';return;}
+  $('conceptoLabel').classList.add('show');
+  $('conceptoNombre').textContent=conceptoFinal||tipoSel;
+  $('semanalPill').style.display=SEMANALES.includes(tipoSel)?'inline-block':'none';
+  $('formSection').style.display='block';
+}
+
+// ── COMPROBANTE ──
+$('compInput').addEventListener('change',()=>{
+  const f=$('compInput').files[0];
+  if(!f)return;
+  compFile=f;
+  $('compNombre').textContent='✓ '+f.name;
+  if(f.type.startsWith('image/')){
+    const r=new FileReader();
+    r.onload=e=>{$('compPrev').src=e.target.result;$('compPrev').style.display='block';};
+    r.readAsDataURL(f);
+  }
+  $('sinComp').checked=false;
+  $('causaWrap').classList.remove('show');
+});
+
+function toggleCausa(){
+  if($('sinComp').checked){
+    $('causaWrap').classList.add('show');
+    compFile=null;$('compPrev').style.display='none';$('compNombre').textContent='';
+  }else{
+    $('causaWrap').classList.remove('show');
+  }
+}
+
+// ── GUARDAR PAGO ──
+async function guardarPago(){
+  const concepto=conceptoFinal||tipoSel;
+  const monto=parseFloat($('fMonto').value)||0;
+  const fecha=$('fFecha').value;
+  const sinComp=$('sinComp').checked;
+  const causa=$('fCausa').value.trim();
+  const err=$('formErr');
+  err.style.display='none';
+
+  if(!concepto){err.textContent='Selecciona un tipo de gasto.';err.style.display='block';return;}
+  if(monto<=0){err.textContent='El monto debe ser mayor a cero.';err.style.display='block';return;}
+  if(!fecha){err.textContent='Ingresa la fecha.';err.style.display='block';return;}
+  if(!compFile&&!sinComp){err.textContent='Adjunta el comprobante o marca "Sin comprobante".';err.style.display='block';return;}
+  if(sinComp&&!causa){err.textContent='Explica por qué no hay comprobante.';err.style.display='block';return;}
+
+  // Sucursal
+  const sucursal=zonaSel||sesion.sucursal||'General';
+  const mes=`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;
+
+  // Anti-duplicado SOLO para no semanales
+  if(!SEMANALES.includes(tipoSel)){
+    const existe=pagos.find(p=>p.concepto===concepto&&p.sucursal===sucursal&&p.mes===mes&&p.fecha===fecha);
+    if(existe){err.textContent='Ya existe un pago de este concepto para esta sucursal en esta fecha.';err.style.display='block';return;}
+  }
+
+  $('guardandoMsg').style.display='inline';
+  document.querySelectorAll('.btn-guardar').forEach(b=>b.disabled=true);
+
+  try{
+    await db.collection('fijos_pagos').add({
+      concepto,sucursal,monto,fecha,mes,
+      capturista:sesion.user,
+      comprobante:compFile?true:false,
+      causaRaiz:sinComp?causa:'',
+      tipo:tipoSel,
+      semanal:SEMANALES.includes(tipoSel),
+      creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    toast(`✓ ${concepto} — ${fmt(monto)}`);
+    limpiarForm();
+    showTab('lista',document.querySelector('[data-tab="lista"]'));
+  }catch(e){
+    err.textContent='Error al guardar. Verifica tu conexión.';err.style.display='block';
+  }finally{
+    $('guardandoMsg').style.display='none';
+    document.querySelectorAll('.btn-guardar').forEach(b=>b.disabled=false);
+  }
+}
+
+function limpiarForm(){
+  $('fMonto').value='';$('fFecha').value=hoyISO();$('fCausa').value='';
+  compFile=null;$('compPrev').style.display='none';$('compNombre').textContent='';
+  $('compInput').value='';$('sinComp').checked=false;$('causaWrap').classList.remove('show');
+  $('formErr').style.display='none';
+  tipoSel=null;zonaSel=null;conceptoFinal=null;
+  document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
+  $('zonaNomina').classList.remove('show');$('zonaServicios').classList.remove('show');
+  $('conceptoLabel').classList.remove('show');$('formSection').style.display='none';
+}
+
+// ── FIREBASE ──
+function suscribir(){
+  // Catálogo
+  db.collection('fijos_catalogo').orderBy('concepto').onSnapshot(snap=>{
+    catalogo=snap.docs.map(d=>({id:d.id,...d.data()}));
+    if($('tabCatalogo').classList.contains('active'))renderCatalogo();
+  });
+  // Pagos en tiempo real
+  db.collection('fijos_pagos').onSnapshot(snap=>{
+    pagos=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderLista();renderKPIs();
+  });
+  // Estados Pagado/Pendiente (para Claudia con corporativos)
+  db.collection('fijos_estados').doc('global').onSnapshot(doc=>{
+    estadosFijos=doc.exists?doc.data():{};
+    renderLista();
+  });
+  // Inicializar catálogo si faltan conceptos
+  inicializarCatalogo();
+}
+
+async function inicializarCatalogo(){
+  const conceptosReq=[
+    'Nómina CDMX','Nómina Morelos','Nómina Puebla','Bonos CDMX','Bonos Morelos','Bonos Puebla',
+    'Préstamo caja chica CDMX','Préstamo caja chica Morelos','Préstamo caja chica Puebla',
+    'Agua CDMX','Agua Morelos','Agua Puebla','Luz CDMX','Luz Morelos','Luz Puebla',
+    'Telmex CDMX','Telmex Morelos','Telmex Puebla','Total Play CDMX','Total Play Morelos','Total Play Puebla',
+    'Telcel','Alarma CDMX','Fumigación CDMX','Seguros CDMX','Seguros Morelos','Seguros Puebla',
+    'Renta de local CDMX','Renta de local Morelos','Renta de local Puebla',
+    'Renta impresoras CDMX','Renta impresoras Morelos','Renta impresoras Puebla',
+    'Cuotas mantenimiento CDMX','Cuotas mantenimiento Morelos','Cuotas mantenimiento Puebla',
+    'EBRO','Hipotecario Banorte','Casanova Rent','Unirenta','Nissan','Santrack',
+    'Hand Held','ADT','Gastos legales','Gasolina personal ventas','Honorarios fijos',
+    'Timbres para facturar','Licencias Microsip','Imprenta','Cuota sindical',
+    'Verificaciones camionetas','Verificaciones automóviles','Tenencia camionetas','Tenencia automóviles'
+  ];
+  const snap=await db.collection('fijos_catalogo').get();
+  const existentes=snap.docs.map(d=>(d.data().concepto||'').toLowerCase().trim());
+  const faltantes=conceptosReq.filter(c=>!existentes.includes(c.toLowerCase().trim()));
+  if(!faltantes.length)return;
+  const batch=db.batch();
+  faltantes.forEach((c,i)=>{
+    const ref=db.collection('fijos_catalogo').doc();
+    batch.set(ref,{concepto:c,orden:existentes.length+i+1,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+  });
+  await batch.commit();
+}
+
+// ── RENDER LISTA ──
+function pagosFiltrados(){
+  const mes=`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;
+  const busca=($('busqueda')?$('busqueda').value.trim().toLowerCase():'');
+  // Filtrar por zona del usuario
+  const zonaPermitida=sesion.rol==='admin'?null:sesion.sucursal;
+  const filtroSuc=$('filtroSuc')?$('filtroSuc').value:'';
+  return pagos
+    .filter(p=>p.mes===mes)
+    .filter(p=>!zonaPermitida||p.sucursal===zonaPermitida||sesion.rol==='admin')
+    .filter(p=>!filtroSuc||p.sucursal===filtroSuc)
+    .filter(p=>!busca||p.concepto.toLowerCase().includes(busca))
+    .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+}
+
+function renderLista(){
+  const lista=pagosFiltrados();
+  const tb=$('tbPagos');
+  if(!lista.length){tb.innerHTML=`<tr><td colspan="7" class="empty">Sin pagos para ${MESES[mesAct]} ${anioAct}.</td></tr>`;return;}
+  tb.innerHTML=lista.map(p=>{
+    const cs=p.sucursal==='CDMX'?'chip-cdmx':p.sucursal==='Morelos'?'chip-morelos':p.sucursal==='Puebla'?'chip-puebla':'chip-general';
+    const comp=p.comprobante?`<span style="color:var(--ok);cursor:pointer;" onclick="verComp('${p.id}')" title="Ver comprobante">📎</span>`:`<span style="color:var(--warn);" title="${p.causaRaiz||'Sin causa raíz'}">⚠</span>`;
+    const puedeEl=sesion.user===p.capturista||esAdmin();
+    return`<tr>
+      <td>${p.fecha}</td>
+      <td style="font-weight:600;">${p.concepto}${p.semanal?'<span style="font-size:9px;color:var(--warn);margin-left:4px;">semanal</span>':''}</td>
+      <td><span class="chip ${cs}">${p.sucursal}</span></td>
+      <td style="color:var(--muted);">${p.capturista}</td>
+      <td>${comp}</td>
+      <td style="text-align:right;font-weight:700;">${fmt(p.monto)}</td>
+      <td>${puedeEl?`<button class="ibtn" onclick="eliminarPago('${p.id}','${p.concepto.replace(/'/g,"\\'")}',${p.monto})" style="color:var(--danger);">✕</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── KPIs ──
+function renderKPIs(){
+  const lista=pagosFiltrados();
+  const total=lista.reduce((a,p)=>a+p.monto,0);
+  const sinComp=lista.filter(p=>!p.comprobante).length;
+  const porSuc={};
+  lista.forEach(p=>{porSuc[p.sucursal]=(porSuc[p.sucursal]||0)+p.monto;});
+  let html=`
+    <div class="kpi"><div class="kpi-lbl">Total del mes</div><div class="kpi-val">${fmt(total)}</div><div style="font-size:11px;color:var(--muted);">${lista.length} pagos</div></div>`;
+  ['CDMX','Morelos','Puebla'].forEach(s=>{
+    if(porSuc[s]){
+      const col=s==='CDMX'?'var(--cdmx)':s==='Morelos'?'var(--morelos)':'var(--puebla)';
+      html+=`<div class="kpi"><div class="kpi-lbl">${s}</div><div class="kpi-val" style="color:${col};">${fmt(porSuc[s])}</div></div>`;
+    }
+  });
+  if(sinComp){html+=`<div class="kpi"><div class="kpi-lbl">Sin comprobante</div><div class="kpi-val" style="color:var(--warn);">${sinComp}</div></div>`;}
+  $('kpiGrid').innerHTML=html;
+}
+
+// ── ELIMINAR ──
+async function eliminarPago(id,concepto,monto){
+  if(!confirm(`¿Eliminar ${concepto} por ${fmt(monto)}?`))return;
+  try{await db.collection('fijos_pagos').doc(id).delete();toast('Pago eliminado.');}
+  catch(e){toast('Error al eliminar.');}
+}
+
+// ── VER COMPROBANTE ──
+function verComp(id){
+  const p=pagos.find(x=>x.id===id);
+  if(!p)return;
+  alert(`Comprobante de: ${p.concepto}\nFecha: ${p.fecha}\nMonto: ${fmt(p.monto)}\nCapturó: ${p.capturista}\n\nEl comprobante físico fue verificado al momento de capturar.`);
+}
+
+
+function verComprobante(id){
+  const p=pagos.find(x=>x.id===id);
+  if(!p)return;
+  alert(`Comprobante de: ${p.concepto}\nFecha: ${p.fecha}\nMonto: ${fmt(p.monto)}\nCapturó: ${p.capturista}\n\nEl comprobante físico fue verificado al momento de capturar.`);
+}
+
+// ── CATÁLOGO ──
+function renderCatalogo(){
+  const lista=$('listaCatalogo');
+  if(!catalogo.length){lista.innerHTML='<div class="empty">Sin conceptos en el catálogo.</div>';return;}
+  lista.innerHTML=catalogo.map(c=>`
+    <div class="cat-item">
+      <span style="font-size:13px;font-weight:600;">${c.concepto}</span>
+      ${esAdmin()||sesion.user==='claudia'?`<button class="ibtn" onclick="eliminarConcepto('${c.id}','${c.concepto.replace(/'/g,"\\'")}')">✕</button>`:''}
+    </div>`).join('');
+}
+
+async function agregarConcepto(){
+  const nombre=$('nuevoConc').value.trim();
+  if(!nombre){toast('Escribe el nombre del concepto.');return;}
+  if(esSoloZona()){
+    if(!nombre.toLowerCase().includes(miZona().toLowerCase())){
+      toast(`El nombre debe incluir tu zona (${miZona()}). Ej: "Gas ${miZona()}"`);return;
+    }
+  }
+  const existe=catalogo.find(c=>c.concepto.toLowerCase()===nombre.toLowerCase());
+  if(existe){toast('Ese concepto ya existe.');return;}
+  try{
+    await db.collection('fijos_catalogo').add({concepto:nombre,orden:catalogo.length+1,agregadoPor:sesion.user,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+    $('nuevoConc').value='';
+    toast(`✓ "${nombre}" agregado.`);
+  }catch(e){toast('Error al agregar.');}
+}
+
+async function eliminarConcepto(id,nombre){
+  if(!confirm(`¿Eliminar "${nombre}" del catálogo?`))return;
+  try{await db.collection('fijos_catalogo').doc(id).delete();toast(`"${nombre}" eliminado.`);}
+  catch(e){toast('Error al eliminar.');}
+}
+
+
+// ── ESTADOS FIJOS (Pagado/Pendiente/Abono) ──
+function claveMes(){return`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;}
+function claveEstado(id){return`${claveMes()}_${id}`;}
+function getEstadoFijo(id){
+  const raw=estadosFijos[claveEstado(id)];
+  if(!raw)return{estado:'pendiente',pagado:0};
+  if(typeof raw==='string')return{estado:raw,pagado:0};
+  return raw;
+}
+function getSaldoFijo(p){
+  const e=getEstadoFijo(p.id);
+  return Math.max(0,(p.monto||0)-(e.pagado||0));
+}
+
+async function guardarEstadoDB(clave,valor){
+  const ref=db.collection('fijos_estados').doc('global');
+  await ref.set({[clave]:valor},{merge:true});
+}
+
+async function toggleEstado(id,valor){
+  try{
+    if(valor==='abono'){
+      const wrap=document.getElementById(`abono-${id}`);
+      if(wrap)wrap.classList.toggle('show');
+      return;
+    }
+    const p=pagos.find(x=>x.id===id);
+    if(!p)return;
+    const total=p.monto||0;
+    if(valor==='pagado'){
+      await guardarEstadoDB(claveEstado(id),{estado:'pagado',pagado:total,fecha:hoyISO()});
+      toast('✓ Marcado como pagado');
+    }else{
+      await guardarEstadoDB(claveEstado(id),{estado:'pendiente',pagado:0,fecha:hoyISO()});
+      toast('Marcado como pendiente');
+    }
+    renderLista();
+  }catch(e){toast('Error al actualizar estado');}
+}
+
+async function registrarAbono(id){
+  const input=document.getElementById(`input-abono-${id}`);
+  if(!input)return;
+  const monto=parseFloat(input.value)||0;
+  if(monto<=0){toast('El monto del abono debe ser mayor a cero.');return;}
+  const p=pagos.find(x=>x.id===id);
+  if(!p)return;
+  const total=p.monto||0;
+  const estadoPrev=getEstadoFijo(id);
+  const pagadoPrev=estadoPrev.pagado||0;
+  const nuevoPagado=pagadoPrev+monto;
+  const nuevoEstado=nuevoPagado>=total?'pagado':'parcial';
+  try{
+    await guardarEstadoDB(claveEstado(id),{estado:nuevoEstado,pagado:nuevoPagado,fecha:hoyISO()});
+    input.value='';
+    const wrap=document.getElementById(`abono-${id}`);
+    if(wrap)wrap.classList.remove('show');
+    toast(nuevoEstado==='pagado'?`✓ Pagado completo: ${fmt(nuevoPagado)}`:`Abono registrado: ${fmt(monto)} · Saldo: ${fmt(total-nuevoPagado)}`);
+    renderLista();
+  }catch(e){toast('Error al registrar abono');}
+}
+
+// ── EXPORT EXCEL ──
+function exportarExcel(){
+  const lista=pagosFiltrados();
+  if(!lista.length){toast('Sin datos para exportar.');return;}
+  const datos=lista.map(p=>({
+    Fecha:p.fecha,Concepto:p.concepto,Sucursal:p.sucursal,
+    Monto:p.monto,Comprobante:p.comprobante?'Sí':'No',
+    'Causa raíz':p.causaRaiz||'',Capturó:p.capturista,
+    Mes:MESES[mesAct]+' '+anioAct
+  }));
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(datos);
+  ws['!cols']=[{wch:12},{wch:28},{wch:10},{wch:14},{wch:12},{wch:30},{wch:12},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws,`Fijos ${MESES[mesAct]}`);
+  XLSX.writeFile(wb,`GastosFijos_${MESES[mesAct]}_${anioAct}.xlsx`);
+  toast('Excel descargado.');
+}
+</script>
+</body>
+</html>
