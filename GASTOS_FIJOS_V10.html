@@ -292,10 +292,32 @@ tr:hover td{background:#fafaf8;}
       <div class="section">
         <div class="sec-title">Agregar concepto al catálogo</div>
         <p id="notaCat" style="font-size:11px;color:var(--muted);margin-bottom:12px;"></p>
-        <div style="display:flex;gap:8px;margin-bottom:16px;">
-          <input type="text" id="nuevoConc" placeholder="Nombre del concepto..." style="flex:1;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
-          <button class="btn-guardar" style="margin:0;" onclick="agregarConcepto()">Agregar</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+        <div>
+          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Nombre *</label>
+          <input type="text" id="nuevoConc" placeholder="Ej: Internet Morelos..." style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
+        </div><div>
+          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Sección *</label>
+          <select id="nuevaSeccion" style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
+            <option value="nomina">Nómina y personal</option>
+            <option value="servicios">Servicios</option>
+            <option value="corporativos">Corporativos</option>
+          </select>
         </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:16px;align-items:end;">
+        <div>
+          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Zona</label>
+          <select id="nuevaZona" style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
+            <option value="">Sin zona</option>
+            <option value="CDMX">CDMX</option>
+            <option value="Morelos">Morelos</option>
+            <option value="Puebla">Puebla</option>
+            <option value="General">General</option>
+          </select>
+        </div>
+        <button class="btn-guardar" style="margin:0;" onclick="agregarConcepto()">Agregar</button>
+      </div>
         <div id="listaCatalogo"></div>
       </div>
     </div>
@@ -431,7 +453,7 @@ function showTab(tab,btn){
   $('view'+tab.charAt(0).toUpperCase()+tab.slice(1)).classList.add('active');
   btn.classList.add('active');
   if(tab==='lista'){renderLista();renderKPIs();}
-  if(tab==='catalogo')renderCatalogo();
+  if(tab==='catalogo'){renderCatalogo();}
 }
 
 // ── CONSTRUCCIÓN DE BOTONES ──
@@ -482,6 +504,29 @@ function construirBotones(){
       {concepto:'Cuota sindical',corp:true},
     ];
     $('gridCorp').innerHTML=corp.map(t=>btnHTML(t)).join('');
+  }
+
+  // ── CONCEPTOS PERSONALIZADOS DEL CATÁLOGO ──
+  const personalizados=catalogo.filter(cx=>cx.personalizado===true);
+  if(personalizados.length){
+    const grpNomina=personalizados.filter(cx=>cx.seccion==='nomina');
+    const grpServicios=personalizados.filter(cx=>cx.seccion==='servicios');
+    const grpCorp=personalizados.filter(cx=>cx.seccion==='corporativos');
+    const sep='<div style="height:1px;background:var(--line);margin:6px 0;width:100%;grid-column:1/-1;"></div>';
+    if(grpNomina.length){
+      const extra=grpNomina.map(cx=>btnHTML({concepto:cx.concepto,conZona:!!cx.conZona,semanal:!!cx.semanal})).join('');
+      $('gridNomina').innerHTML+=sep+extra;
+    }
+    if(grpServicios.length){
+      const extra=grpServicios.map(cx=>btnHTML({concepto:cx.concepto,conZona:!!cx.conZona,semanal:!!cx.semanal})).join('');
+      $('gridServicios').innerHTML+=sep+extra;
+    }
+    if(grpCorp.length&&(esAdmin()||sesion.user==='claudia')){
+      $('divCorp').style.display='block';
+      $('gridCorp').style.display='grid';
+      const extra=grpCorp.map(cx=>btnHTML({concepto:cx.concepto,corp:true,semanal:!!cx.semanal})).join('');
+      $('gridCorp').innerHTML+=sep+extra;
+    }
   }
 
   // Selector de zona para nómina/servicios
@@ -547,8 +592,9 @@ function selTipo(concepto,conZona,tipoCls){
       const btn=wrap.querySelector('.zona-btn');
       if(btn){selZona(btn,miZona(),wrap.id);}
     }else{
-      // Limpiar selección previa
-      wrap.querySelectorAll('.zona-btn').forEach(b=>b.className='zona-btn');
+      // Admin — limpiar selección previa con estilos inline
+      const bs='padding:8px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--field);color:var(--muted);font-family:var(--font);flex:1;text-align:center;';
+      wrap.querySelectorAll('[data-zona]').forEach(b=>{b.style.cssText=bs;});
       conceptoFinal=null;
       actualizarLabel();
       return;
@@ -673,6 +719,7 @@ function suscribir(){
   // Catálogo
   db.collection('fijos_catalogo').orderBy('concepto').onSnapshot(snap=>{
     catalogo=snap.docs.map(d=>({id:d.id,...d.data()}));
+    construirBotones();
     if($('tabCatalogo').classList.contains('active'))renderCatalogo();
   });
   // Pagos en tiempo real
@@ -804,7 +851,10 @@ function renderCatalogo(){
 
 async function agregarConcepto(){
   const nombre=$('nuevoConc').value.trim();
+  const seccion=$('nuevaSeccion')?$('nuevaSeccion').value:'servicios';
+  const zona=$('nuevaZona')?$('nuevaZona').value:'';
   if(!nombre){toast('Escribe el nombre del concepto.');return;}
+  if(!seccion){toast('Selecciona la sección.');return;}
   if(esSoloZona()){
     if(!nombre.toLowerCase().includes(miZona().toLowerCase())){
       toast(`El nombre debe incluir tu zona (${miZona()}). Ej: "Gas ${miZona()}"`);return;
@@ -812,10 +862,22 @@ async function agregarConcepto(){
   }
   const existe=catalogo.find(c=>c.concepto.toLowerCase()===nombre.toLowerCase());
   if(existe){toast('Ese concepto ya existe.');return;}
+  const conZona=['nomina','servicios'].includes(seccion);
   try{
-    await db.collection('fijos_catalogo').add({concepto:nombre,orden:catalogo.length+1,agregadoPor:sesion.user,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+    await db.collection('fijos_catalogo').add({
+      concepto:nombre,
+      seccion:seccion,
+      zona:zona||'',
+      conZona:conZona,
+      semanal:false,
+      orden:catalogo.length+1,
+      agregadoPor:sesion.user,
+      personalizado:true,
+      creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+    });
     $('nuevoConc').value='';
-    toast(`✓ "${nombre}" agregado.`);
+    toast(`✓ "${nombre}" agregado en ${seccion}.`);
+    construirBotones();
   }catch(e){toast('Error al agregar.');}
 }
 
