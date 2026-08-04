@@ -189,6 +189,7 @@ tr:hover td{background:#fafaf8;}
     <button class="nav-btn active" data-tab="captura" onclick="showTab('captura',this)">Capturar</button>
     <button class="nav-btn" data-tab="lista" onclick="showTab('lista',this)">Pagos del mes</button>
     <button class="nav-btn" data-tab="catalogo" id="tabCatalogo" style="display:none;" onclick="showTab('catalogo',this)">Catálogo</button>
+    <button class="nav-btn" data-tab="masiva" id="tabMasiva" style="display:none;" onclick="showTab('masiva',this)">Carga masiva</button>
   </div>
 
   <div class="wrap">
@@ -322,6 +323,40 @@ tr:hover td{background:#fafaf8;}
       </div>
     </div>
 
+    <!-- TAB CARGA MASIVA -->
+    <div id="viewMasiva" class="view" style="display:none;">
+      <div class="section">
+        <div class="sec-title">Plantilla Excel — descarga, llena y sube</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Descarga la plantilla, llena tus gastos fijos y súbela. El sistema los carga todos en Firebase de una vez.</p>
+        <button class="btn-sec" onclick="descargarPlantillaFijos()" style="margin-bottom:12px;">⬇ Descargar plantilla Excel</button>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:12px;padding:8px 12px;background:var(--surface-1);border-radius:8px;">
+          <strong>Columnas:</strong> concepto · sucursal · monto · fecha (DD/MM/AAAA) · seccion (nomina/servicios/corporativos) · causa_raiz (opcional)
+        </div>
+        <div id="uploadZonaMasiva" style="border:2px dashed var(--line);border-radius:10px;padding:20px;text-align:center;cursor:pointer;background:var(--surface-1);" onclick="$('inputMasiva').click()">
+          <div style="font-size:28px;margin-bottom:6px;">📂</div>
+          <p style="font-size:13px;font-weight:500;">Arrastra tu Excel aquí o toca para seleccionarlo</p>
+          <p style="font-size:11px;color:var(--muted);margin-top:4px;">Formatos: .xlsx, .xls, .csv</p>
+          <input type="file" id="inputMasiva" accept=".xlsx,.xls,.csv" style="display:none;">
+        </div>
+        <div id="prevMasiva" style="display:none;margin-top:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;font-weight:500;" id="prevMasivaInfo"></div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn-sec" onclick="cancelarMasiva()">Cancelar</button>
+              <button class="btn-guardar" style="margin:0;" onclick="confirmarMasiva()">Guardar todos</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead id="prevMasivaHead"></thead>
+              <tbody id="prevMasivaBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="resultMasiva" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:12px;"></div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -414,8 +449,9 @@ function iniciarSesion(){
   $('sucBadge').className='badge-suc '+bc;
   $('sucBadge').textContent=esAdmin()?'Admin':sesion.sucursal;
   $('userBadge').textContent=sesion.user;
-  // Tab catálogo visible para todos
+  // Tab catálogo y carga masiva visibles para admin/claudia
   $('tabCatalogo').style.display='inline-block';
+  if(esAdmin()||sesion.user==='claudia') $('tabMasiva').style.display='inline-block';
   // Nota catálogo
   $('notaCat').textContent=esSoloZona()?
     `Escribe el nombre, elige la sección y la zona. El botón aparece de inmediato.`:
@@ -455,6 +491,7 @@ function showTab(tab,btn){
   btn.classList.add('active');
   if(tab==='lista'){renderLista();renderKPIs();}
   if(tab==='catalogo'){renderCatalogo();}
+  if(tab==='masiva'){$('inputMasiva').value='';$('prevMasiva').style.display='none';$('resultMasiva').style.display='none';}
 }
 
 // ── CONSTRUCCIÓN DE BOTONES ──
@@ -946,7 +983,143 @@ async function registrarAbono(id){
   }catch(e){toast('Error al registrar abono');}
 }
 
-// ── EXPORT EXCEL ──
+// ── CARGA MASIVA ──
+let datosMasiva=[];
+
+// Listener del input de archivo
+setTimeout(()=>{
+  const inp=$('inputMasiva');
+  if(inp) inp.addEventListener('change',()=>{
+    const f=inp.files[0];
+    if(!f)return;
+    const r=new FileReader();
+    r.onload=e=>{
+      try{
+        const wb=XLSX.read(e.target.result,{type:'array'});
+        const ws=wb.Sheets[wb.SheetNames[0]];
+        const filas=XLSX.utils.sheet_to_json(ws,{defval:''});
+        procesarMasiva(filas);
+      }catch(ex){
+        $('resultMasiva').style.display='block';
+        $('resultMasiva').style.background='var(--danger-bg)';
+        $('resultMasiva').style.color='var(--danger)';
+        $('resultMasiva').textContent='Error al leer el archivo. Verifica que sea .xlsx o .csv válido.';
+      }
+    };
+    r.readAsArrayBuffer(f);
+  });
+},600);
+
+function procesarMasiva(filas){
+  const errores=[];
+  const datos=[];
+  const mes=`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;
+  filas.forEach((fila,i)=>{
+    const concepto=String(fila.concepto||fila.Concepto||'').trim();
+    const sucursal=String(fila.sucursal||fila.Sucursal||'General').trim();
+    const monto=parseFloat(String(fila.monto||fila.Monto||'0').replace(/,/g,''))||0;
+    const fechaRaw=String(fila.fecha||fila.Fecha||'').trim();
+    const seccion=String(fila.seccion||fila.Seccion||fila.sección||'servicios').trim().toLowerCase();
+    const causaRaiz=String(fila.causa_raiz||fila['Causa raíz']||'').trim();
+
+    if(!concepto){errores.push(`Fila ${i+2}: falta el concepto`);return;}
+    if(monto<=0){errores.push(`Fila ${i+2}: monto inválido (${monto})`);return;}
+    if(!fechaRaw){errores.push(`Fila ${i+2}: falta la fecha`);return;}
+
+    // Convertir fecha DD/MM/AAAA → AAAA-MM-DD
+    let fecha=fechaRaw;
+    if(fechaRaw.includes('/')){
+      const p=fechaRaw.split('/');
+      if(p.length===3) fecha=`${p[2].padStart(4,'20')}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+    }
+    const seccionVal=['nomina','servicios','corporativos'].includes(seccion)?seccion:'servicios';
+    datos.push({concepto,sucursal,monto,fecha,mes,seccion:seccionVal,causaRaiz,
+      capturista:sesion.user,comprobante:false,semanal:false,
+      creadoEn:null});
+  });
+
+  if(errores.length){
+    $('resultMasiva').style.display='block';
+    $('resultMasiva').style.background='var(--danger-bg)';
+    $('resultMasiva').style.color='var(--danger)';
+    $('resultMasiva').textContent=errores.slice(0,5).join(' · ')+(errores.length>5?` y ${errores.length-5} más`:'');
+    return;
+  }
+
+  datosMasiva=datos;
+  $('resultMasiva').style.display='none';
+
+  // Vista previa
+  $('prevMasivaInfo').textContent=`${datos.length} registros listos para cargar en ${MESES[mesAct]} ${anioAct}`;
+  const thStyle='background:var(--surface-1);padding:6px 10px;text-align:left;border-bottom:0.5px solid var(--border);font-size:10px;text-transform:uppercase;color:var(--text-secondary);';
+  const tdStyle='padding:6px 10px;border-bottom:0.5px solid var(--border);';
+  $('prevMasivaHead').innerHTML=`<tr><th style="${thStyle}">Concepto</th><th style="${thStyle}">Sucursal</th><th style="${thStyle}">Monto</th><th style="${thStyle}">Fecha</th><th style="${thStyle}">Sección</th></tr>`;
+  $('prevMasivaBody').innerHTML=datos.map(d=>`<tr>
+    <td style="${tdStyle}font-weight:500;">${d.concepto}</td>
+    <td style="${tdStyle}">${d.sucursal}</td>
+    <td style="${tdStyle};text-align:right;">${fmt(d.monto)}</td>
+    <td style="${tdStyle}">${d.fecha}</td>
+    <td style="${tdStyle};color:var(--text-secondary);">${d.seccion}</td>
+  </tr>`).join('');
+  $('prevMasiva').style.display='block';
+}
+
+async function confirmarMasiva(){
+  if(!datosMasiva.length)return;
+  const btn=document.querySelector('[onclick="confirmarMasiva()"]');
+  if(btn){btn.disabled=true;btn.textContent='Guardando...';}
+  const mes=`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;
+  let ok=0,errores=0;
+  // Guardar en batches de 20
+  const chunks=[];
+  for(let i=0;i<datosMasiva.length;i+=20) chunks.push(datosMasiva.slice(i,i+20));
+  for(const chunk of chunks){
+    const batch=db.batch();
+    chunk.forEach(d=>{
+      const ref=db.collection('fijos_pagos').doc();
+      batch.set(ref,{...d,mes,creadoEn:firebase.firestore.FieldValue.serverTimestamp()});
+      ok++;
+    });
+    try{await batch.commit();}catch(e){errores+=chunk.length;ok-=chunk.length;}
+  }
+  $('prevMasiva').style.display='none';
+  const res=$('resultMasiva');
+  res.style.display='block';
+  if(errores===0){
+    res.style.background='var(--ok-bg)';res.style.color='var(--ok)';
+    res.textContent=`✓ ${ok} registros guardados correctamente en Firebase.`;
+    toast(`✓ ${ok} gastos fijos cargados`);
+    datosMasiva=[];
+    $('inputMasiva').value='';
+  }else{
+    res.style.background='var(--warn-bg)';res.style.color='var(--warn)';
+    res.textContent=`${ok} guardados · ${errores} con error. Revisa tu conexión.`;
+  }
+  if(btn){btn.disabled=false;btn.textContent='Guardar todos';}
+}
+
+function cancelarMasiva(){
+  datosMasiva=[];
+  $('prevMasiva').style.display='none';
+  $('resultMasiva').style.display='none';
+  $('inputMasiva').value='';
+}
+
+function descargarPlantillaFijos(){
+  const datos=[
+    {concepto:'Casanova Rent Contrato 1',sucursal:'General',monto:25933,fecha:'01/08/2026',seccion:'corporativos',causa_raiz:''},
+    {concepto:'Nómina CDMX semana 1',sucursal:'CDMX',monto:45000,fecha:'01/08/2026',seccion:'nomina',causa_raiz:''},
+    {concepto:'Agua CDMX',sucursal:'CDMX',monto:3200,fecha:'05/08/2026',seccion:'servicios',causa_raiz:''},
+  ];
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.json_to_sheet(datos);
+  ws['!cols']=[{wch:30},{wch:10},{wch:12},{wch:14},{wch:14},{wch:30}];
+  XLSX.utils.book_append_sheet(wb,ws,'Gastos Fijos');
+  XLSX.writeFile(wb,'Plantilla_GastosFijos_Ferregama.xlsx');
+  toast('Plantilla descargada');
+}
+
+// ── FIN CARGA MASIVA ──
 function exportarExcel(){
   const lista=pagosFiltrados();
   if(!lista.length){toast('Sin datos para exportar.');return;}
