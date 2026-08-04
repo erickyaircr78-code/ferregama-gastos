@@ -492,27 +492,45 @@ function construirBotones(){
 function btnHTML(t){
   const cls=['tipo-btn',t.corp?'corp':'',t.semanal?'semanal':''].filter(Boolean).join(' ');
   const sub=t.semanal?'semanal':t.conZona?'↓ zona':(t.subLbl||'');
-  return`<button class="${cls}" onclick="selTipo('${t.concepto}',${!!t.conZona},'${t.corp?'corp':t.semanal?'semanal':''}')">${t.concepto}${sub?`<span class="sub-lbl">${sub}</span>`:''}</button>`;
+  const subHtml=sub?`<span class="sub-lbl">${sub}</span>`:'';
+  return`<button class="${cls}" data-concepto="${t.concepto}" data-conzona="${!!t.conZona}" data-tipocls="${t.corp?'corp':t.semanal?'semanal':''}">${t.concepto}${subHtml}</button>`;
 }
 
-function zonaHTML(id){
-  const btnStyle='padding:8px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--field);color:var(--muted);font-family:var(--font);flex:1;text-align:center;';
-  if(esSoloZona()){
-    return`<button style="${btnStyle}background:var(--cdmx-bg);border-color:var(--cdmx);color:var(--cdmx);" onclick="selZona(this,'${miZona()}','${id}')">${miZona()} ✓</button>`;
+// Event delegation para botones de tipo
+document.addEventListener('click',function(e){
+  const btn=e.target.closest('[data-concepto]');
+  if(btn&&btn.dataset.concepto){
+    selTipo(btn.dataset.concepto,btn.dataset.conzona==='true',btn.dataset.tipocls||'');
   }
-  const zonas=['CDMX','Morelos','Puebla','General'];
-  return zonas.map(z=>
-    `<button class="zona-btn" style="${btnStyle}" onclick="selZona(this,'${z}','${id}')">${z}</button>`
+});
+
+function zonaHTML(id){
+  const bs='padding:8px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--field);color:var(--muted);font-family:var(--font);flex:1;text-align:center;';
+  if(esSoloZona()){
+    const z=miZona();
+    return`<button style="${bs}background:var(--cdmx-bg);border-color:var(--cdmx);color:var(--cdmx);" data-zona="${z}" data-wrap="${id}">${z} ✓</button>`;
+  }
+  return['CDMX','Morelos','Puebla','General'].map(z=>
+    `<button style="${bs}" data-zona="${z}" data-wrap="${id}">${z}</button>`
   ).join('');
 }
+
+// Event delegation para botones de zona
+document.addEventListener('click',function(e){
+  const btn=e.target.closest('[data-zona]');
+  if(btn&&btn.dataset.wrap){
+    selZona(btn,btn.dataset.zona,btn.dataset.wrap);
+  }
+});
+
 
 // ── SELECCIÓN DE TIPO ──
 function selTipo(concepto,conZona,tipoCls){
   // Deseleccionar todos
   document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
-  // Seleccionar el presionado
-  document.querySelectorAll('.tipo-btn').forEach(b=>{
-    if(b.textContent.trim().startsWith(concepto))b.classList.add('active');
+  // Seleccionar el presionado por data-concepto
+  document.querySelectorAll('[data-concepto]').forEach(b=>{
+    if(b.dataset.concepto===concepto)b.classList.add('active');
   });
   tipoSel=concepto;
   zonaSel=null;

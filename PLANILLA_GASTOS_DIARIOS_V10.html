@@ -454,7 +454,7 @@ tr:hover td{background:#faf8f3;}
               <option value="Ticket ilegible">Ticket ilegible</option>
               <option value="Urgencia fuera de horario">Urgencia fuera de horario</option>
               <option value="Requerimiento en ruta o inspección (sin recibo posible)">Requerimiento en ruta o inspección (sin recibo posible)</option>
-              <option value="Otro">Otro — explica el motivo</option>
+              <option value="Falla de medio de pago">Falla de medio de pago (tarjeta o terminal no pasó, se pagó en efectivo)</option>
             </select>
             <!-- Opción 7: campos adicionales obligatorios -->
             <div id="rutaWrap" style="display:none;margin-top:10px;padding:12px;background:var(--warn-bg);border-radius:8px;border:1px solid var(--warn);">
@@ -479,11 +479,7 @@ tr:hover td{background:#faf8f3;}
                 </select>
               </div>
             </div>
-            <!-- Opción 8: campo texto obligatorio -->
-            <div id="otroWrap" style="display:none;margin-top:8px;">
-              <label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);">Explica el motivo * (va a revisión de Lilian)</label>
-              <textarea id="causaOtro" rows="2" placeholder="Describe el motivo..." style="width:100%;padding:8px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;font-family:inherit;margin-top:4px;resize:vertical;"></textarea>
-            </div>
+
           </div>
 
           <div class="fg">
@@ -493,6 +489,19 @@ tr:hover td{background:#faf8f3;}
           </div>
 
           <input type="hidden" id="capturista">
+
+          <!-- OTRO MOTIVO — campo independiente -->
+          <div class="fg" style="margin-top:12px;padding:10px 12px;background:var(--field);border-radius:8px;border:1.5px solid var(--line);">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input type="checkbox" id="chkOtroMotivo" style="width:16px;height:16px;" onchange="toggleOtroMotivo()">
+              <label for="chkOtroMotivo" style="font-size:12px;font-weight:600;cursor:pointer;">Otro motivo <span style="font-size:10px;color:var(--muted);">(autorización va a Dirección)</span></label>
+            </div>
+            <div id="otroMotivoWrap" style="display:none;margin-top:8px;">
+              <label style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px;">Explica el motivo * (mínimo 15 caracteres)</label>
+              <textarea id="otroMotivoTexto" rows="2" placeholder="Describe el motivo con detalle..." style="width:100%;padding:8px;border:1.5px solid var(--line);border-radius:7px;font-size:12px;font-family:inherit;resize:vertical;" oninput="contarCharsOtro()"></textarea>
+              <div id="otroMotivoCount" style="font-size:11px;color:var(--danger);text-align:right;margin-top:2px;">0 / 15 mínimo</div>
+            </div>
+          </div>
 
           <!-- VITAL / NO VITAL -->
           <div class="fg" style="margin-top:12px;">
@@ -1127,11 +1136,32 @@ function actualizarCausaRaiz(){
     document.getElementById('rutaUnidad').value='';
     document.getElementById('rutaMotivo').value='';
   }
-  if(val!=='Otro')document.getElementById('causaOtro').value='';
+  // causaOtro eliminado — ahora es otroMotivoTexto en checkbox independiente
 }
 
 let vitalSel=null;
 let metodoPagoSel=null;
+
+function toggleOtroMotivo(){
+  const checked=document.getElementById('chkOtroMotivo').checked;
+  const wrap=document.getElementById('otroMotivoWrap');
+  if(wrap)wrap.style.display=checked?'block':'none';
+  if(!checked){
+    const txt=document.getElementById('otroMotivoTexto');
+    if(txt)txt.value='';
+    const cnt=document.getElementById('otroMotivoCount');
+    if(cnt){cnt.textContent='0 / 15 mínimo';cnt.style.color='var(--danger)';}
+  }
+}
+
+function contarCharsOtro(){
+  const txt=document.getElementById('otroMotivoTexto');
+  const cnt=document.getElementById('otroMotivoCount');
+  if(!txt||!cnt)return;
+  const n=txt.value.length;
+  cnt.textContent=`${n} / 15 mínimo`;
+  cnt.style.color=n>=15?'var(--ok)':'var(--danger)';
+}
 
 function selVital(val){
   vitalSel=val;
@@ -1294,10 +1324,12 @@ $('submitBtn').addEventListener('click',async()=>{
     if(!motivo){msg.textContent='Campo obligatorio: Motivo alegado.';msg.className='status-msg err';return;}
   }
 
-  // ── VALIDACIÓN OPCIÓN 8 (OTRO) ──
-  if(causaRaizVal==='Otro'){
-    const textoOtro=document.getElementById('causaOtro').value.trim();
-    if(!textoOtro){msg.textContent='Explica el motivo (campo Otro es obligatorio).';msg.className='status-msg err';return;}
+  // ── VALIDACIÓN OTRO MOTIVO (checkbox independiente) ──
+  const chkOtro=document.getElementById('chkOtroMotivo');
+  const esOtroMotivo=chkOtro&&chkOtro.checked;
+  if(esOtroMotivo){
+    const textoOtro=document.getElementById('otroMotivoTexto')?document.getElementById('otroMotivoTexto').value.trim():'';
+    if(textoOtro.length<15){msg.textContent=`El campo "Otro motivo" requiere mínimo 15 caracteres (tienes ${textoOtro.length}).`;msg.className='status-msg err';return;}
   }
   // ── COMPROBANTE O CAUSA RAÍZ OBLIGATORIO ──
   // Excepciones: Bonificación a cliente, Gastos fijos, Efectivale, TAG
@@ -1314,7 +1346,8 @@ $('submitBtn').addEventListener('click',async()=>{
   const esRuta=causaRaizFinal==='Requerimiento en ruta o inspección (sin recibo posible)';
   const mov={fecha:hoyISO(),tipo:tipoSel,sucursal:sesion.suc,persona:persona||'',concepto,monto,capturista:cap,autorizado:autorizado||'',
     causaRaiz:causaRaizFinal,
-    causaOtro:causaRaizFinal==='Otro'?(document.getElementById('causaOtro')?document.getElementById('causaOtro').value.trim():''):'',
+    otroMotivo:(document.getElementById('chkOtroMotivo')&&document.getElementById('chkOtroMotivo').checked)?(document.getElementById('otroMotivoTexto')?document.getElementById('otroMotivoTexto').value.trim():''):'',
+    esOtroMotivo:!!(document.getElementById('chkOtroMotivo')&&document.getElementById('chkOtroMotivo').checked),
     vital:vitalSel||null,
     metodoPago:metodoPagoSel||null,
     esRuta:esRuta,
@@ -1352,7 +1385,16 @@ $('submitBtn').addEventListener('click',async()=>{
     $('persona').value='';$('monto').value='';$('concepto').value='';
     $('autorizado').value='';if($('causaRaiz'))$('causaRaiz').value='';
     // Resetear campos nuevos de Pepe
-    vitalSel=null;metodoPagoSel=null;
+    // Limpiar Otro motivo
+  const chkOtroEl=document.getElementById('chkOtroMotivo');
+  if(chkOtroEl)chkOtroEl.checked=false;
+  const otroWrapEl=document.getElementById('otroMotivoWrap');
+  if(otroWrapEl)otroWrapEl.style.display='none';
+  const otroTxtEl=document.getElementById('otroMotivoTexto');
+  if(otroTxtEl)otroTxtEl.value='';
+  const otroCntEl=document.getElementById('otroMotivoCount');
+  if(otroCntEl){otroCntEl.textContent='0 / 15 mínimo';otroCntEl.style.color='var(--danger)';}
+  vitalSel=null;metodoPagoSel=null;
     ['vitalSi','vitalNo'].forEach(id=>{const el=$(id);if(el)el.className='vital-btn';});
     ['metEfectivo','metTransferencia','metVale'].forEach(id=>{const el=$(id);if(el)el.className='metodo-btn';});
     const rwEl=$('rutaWrap');if(rwEl)rwEl.style.display='none';
@@ -1360,7 +1402,7 @@ $('submitBtn').addEventListener('click',async()=>{
     const rlEl=$('rutaLugar');if(rlEl)rlEl.value='';
     const ruEl=$('rutaUnidad');if(ruEl)ruEl.value='';
     const rmEl=$('rutaMotivo');if(rmEl)rmEl.value='';
-    const coEl=$('causaOtro');if(coEl)coEl.value='';
+    // causaOtro eliminado — limpieza de otroMotivoTexto ya está arriba
     perteneceAVal='';['pertOp','pertOp3','pertAdm','pertVta','pertVta3'].forEach(id=>{const el=$(id);if(el)el.classList.remove('activo');});
     $('hint').className='hint';limpiarDots();limpiarComp();revisarAuth();$('concepto').focus();
   }catch(e){
