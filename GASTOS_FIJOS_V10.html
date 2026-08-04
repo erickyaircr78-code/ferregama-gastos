@@ -324,7 +324,7 @@ tr:hover td{background:#fafaf8;}
     </div>
 
     <!-- TAB CARGA MASIVA -->
-    <div id="viewMasiva" class="view" style="display:none;">
+    <div id="viewMasiva" class="view">
       <div class="section">
         <div class="sec-title">Plantilla Excel — descarga, llena y sube</div>
         <p style="font-size:12px;color:var(--muted);margin-bottom:12px;">Descarga la plantilla, llena tus gastos fijos y súbela. El sistema los carga todos en Firebase de una vez.</p>
@@ -1106,6 +1106,7 @@ function cancelarMasiva(){
 }
 
 function descargarPlantillaFijos(){
+  if(typeof XLSX==='undefined'){toast('Error: librería Excel no cargada. Recarga la página.');return;}
   const datos=[
     {concepto:'Casanova Rent Contrato 1',sucursal:'General',monto:25933,fecha:'01/08/2026',seccion:'corporativos',causa_raiz:''},
     {concepto:'Nómina CDMX semana 1',sucursal:'CDMX',monto:45000,fecha:'01/08/2026',seccion:'nomina',causa_raiz:''},
