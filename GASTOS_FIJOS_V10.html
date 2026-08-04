@@ -295,7 +295,7 @@ tr:hover td{background:#fafaf8;}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
         <div>
           <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Nombre *</label>
-          <input type="text" id="nuevoConc" placeholder="Ej: Internet Morelos..." style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
+          <input type="text" id="nuevoConc" placeholder="Ej: Seguro camioneta, Gas LP..." style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
         </div><div>
           <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Sección *</label>
           <select id="nuevaSeccion" style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
@@ -418,7 +418,8 @@ function iniciarSesion(){
   $('tabCatalogo').style.display='inline-block';
   // Nota catálogo
   $('notaCat').textContent=esSoloZona()?
-    `Puedes agregar conceptos de tu zona (${miZona()}). El nombre debe incluir la zona. Ej: "Gas ${miZona()}".`:
+    `Escribe el nombre, elige la sección y la zona. El botón aparece de inmediato.`:
+    'Escribe el nombre, elige en qué sección quieres que aparezca el botón y si aplica a una zona específica.';
     'Agrega o elimina conceptos del catálogo. Aplica para todos los usuarios.';
   // Fecha de hoy
   $('fFecha').value=hoyISO();
@@ -855,11 +856,6 @@ async function agregarConcepto(){
   const zona=$('nuevaZona')?$('nuevaZona').value:'';
   if(!nombre){toast('Escribe el nombre del concepto.');return;}
   if(!seccion){toast('Selecciona la sección.');return;}
-  if(esSoloZona()){
-    if(!nombre.toLowerCase().includes(miZona().toLowerCase())){
-      toast(`El nombre debe incluir tu zona (${miZona()}). Ej: "Gas ${miZona()}"`);return;
-    }
-  }
   const existe=catalogo.find(c=>c.concepto.toLowerCase()===nombre.toLowerCase());
   if(existe){toast('Ese concepto ya existe.');return;}
   const conZona=['nomina','servicios'].includes(seccion);
@@ -877,7 +873,7 @@ async function agregarConcepto(){
     });
     $('nuevoConc').value='';
     toast(`✓ "${nombre}" agregado en ${seccion}.`);
-    construirBotones();
+    // construirBotones se llama automáticamente por el onSnapshot
   }catch(e){toast('Error al agregar.');}
 }
 
