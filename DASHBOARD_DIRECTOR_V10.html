@@ -619,7 +619,7 @@ function renderTodo(){
   const fijosV4Total=fijosV4Mes.reduce((a,p)=>a+p.monto,0);
   // Si hay compromisos configurados usarlos, si no mostrar solo lo pagado
   const tieneCompromisos=catalogoFijos.some(c=>c.monto>0);
-  const fijosTotal=tieneCompromisos?catalogoFijos.reduce((a,c)=>a+c.monto,0)+fijosV4Total:fijosV4Total;
+  const fijosTotal=tieneCompromisos?catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0)+fijosV4Total:fijosV4Total;
   const fijosPend=tieneCompromisos?catalogoFijos.reduce((a,c)=>a+getSaldoFijo(c),0):0;
   $('hPend').textContent=fmt(fijosPend);
   $('hPendSub').textContent=`${MESES[mesAct]} ${anioAct}`;
@@ -825,7 +825,7 @@ function analizarDatos(){
   if(sinComp.length>0) alertas.push(`<span style="color:#f0a0a0;">🚫 ${sinComp.length} gasto(s) sin comprobante ni causa raíz — requieren atención inmediata.</span>`);
   if(sinCapturarHoy.length>0) alertas.push(`<span style="color:#f0d080;">⏰ Las sucursales <strong>${sinCapturarHoy.join(', ')}</strong> no han capturado nada hoy.</span>`);
   if(gastosMayores.length>0) alertas.push(`<span style="color:#f0d080;">⚡ ${gastosMayores.length} gasto(s) mayores a $10,000 en el periodo — verificar autorizaciones.</span>`);
-  if(fijosPend.length>0) alertas.push(`<span style="color:#f0d080;">📋 ${fijosPend.length} gasto(s) fijo(s) pendientes de pago este mes (${fmt(fijosPend.reduce((a,c)=>a+c.monto,0))}).</span>`);
+  if(fijosPend.length>0) alertas.push(`<span style="color:#f0d080;">📋 ${fijosPend.length} gasto(s) fijo(s) pendientes de pago este mes (${fmt(fijosPend.reduce((a,c)=>a+(Number(c.monto)||0),0))}).</span>`);
   if(conAutor.length>0) alertas.push(`<span style="color:#9eb8a8;">✓ ${conAutor.length} gasto(s) con autorización especial registrada.</span>`);
   if(alertas.length>0) parrafos.push(alertas.join('<br>'));
   if(sinComp.length===0&&sinCapturarHoy.length===0&&bonifNoCuadran.length===0){
@@ -874,7 +874,7 @@ function responderPregunta(pregunta){
     const totalOp=gastos.reduce((a,m)=>a+m.monto,0);
     const totalBn=bonifs.reduce((a,m)=>a+m.monto,0);
     const totalEf=efectivaleRegs.reduce((a,r)=>a+r.cargo,0);
-    const totalFj=catalogoFijos.reduce((a,c)=>a+c.monto,0);
+    const totalFj=catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0);
     return `Total egresos del periodo:<br><strong>Operativo:</strong> ${fmt(totalOp)}<br><strong>Bonificaciones:</strong> ${fmt(totalBn)}<br><strong>Efectivale:</strong> ${fmt(totalEf)}<br><strong>Fijos:</strong> ${fmt(totalFj)}<br><strong>Gran total: ${fmt(totalOp+totalBn+totalEf+totalFj)}</strong>`;
   }
 
@@ -999,9 +999,9 @@ function responderPregunta(pregunta){
 
   // ── GASTOS FIJOS ──
   if(p.includes('fijo')||p.includes('renta')){
-    const totFijos=catalogoFijos.reduce((a,c)=>a+c.monto,0);
+    const totFijos=catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0);
     const pend=catalogoFijos.filter(c=>getSaldoFijo(c)>0);
-    const totPend=pend.reduce((a,c)=>a+c.monto,0);
+    const totPend=pend.reduce((a,c)=>a+(Number(c.monto)||0),0);
     if(!totFijos) return 'No hay gastos fijos registrados para este mes.';
     return `Gastos fijos del mes: <strong>${fmt(totFijos)}</strong><br>Pendientes: <strong style="color:#f0d080;">${fmt(totPend)}</strong> (${pend.length} conceptos)<br>Pagados: ${fmt(totFijos-totPend)}`;
   }
@@ -1010,7 +1010,7 @@ function responderPregunta(pregunta){
   if(p.includes('total')||p.includes('cuanto')||p.includes('resumen')||p.includes('gastamos')||p.includes('llevamos')||p.includes('periodo')||p.includes('mes')){
     const total=gastos.reduce((a,m)=>a+m.monto,0);
     const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
-    return `Periodo actual:<br><strong>Gasto operativo:</strong> ${fmt(total)} (${gastos.length} movimientos)<br><strong>Bonificaciones:</strong> ${fmt(totalBonif)} (${bonifs.length} registros)<br><strong>Total egresos:</strong> ${fmt(total+totalBonif+catalogoFijos.reduce((a,c)=>a+c.monto,0))}`;
+    return `Periodo actual:<br><strong>Gasto operativo:</strong> ${fmt(total)} (${gastos.length} movimientos)<br><strong>Bonificaciones:</strong> ${fmt(totalBonif)} (${bonifs.length} registros)<br><strong>Total egresos:</strong> ${fmt(total+totalBonif+catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0))}`;
   }
 
   // ── COMPROBANTES ──
@@ -1197,7 +1197,7 @@ function generarReporte(tipo){
       {'Indicador':'Movimientos registrados','Valor':gastos.length},
       {'Indicador':'Sin comprobante ni causa raíz','Valor':gastos.filter(m=>!m.comprobante&&!m.causaRaiz).length},
       {'Indicador':'Con autorización especial','Valor':gastos.filter(m=>m.autorizado).length},
-      {'Indicador':'Gastos fijos del mes','Valor':catalogoFijos.reduce((a,c)=>a+c.monto,0)},
+      {'Indicador':'Gastos fijos del mes','Valor':catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0)},
       {'Indicador':'Gastos fijos pendientes','Valor':catalogoFijos.reduce((a,c)=>a+getSaldoFijo(c),0)},
     ];
     const ws1=XLSX.utils.json_to_sheet(resumen);
@@ -1305,7 +1305,7 @@ function generarReporte(tipo){
 
   } else if(tipo==='fijosvsvar'){
     const totalVar=gastos.reduce((a,m)=>a+m.monto,0);
-    const totalFijos=catalogoFijos.reduce((a,c)=>a+c.monto,0);
+    const totalFijos=catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0);
     const fijosPag=catalogoFijos.reduce((a,c)=>a+getPagadoFijo(c),0);
     const fijosPend=totalFijos-fijosPag;
     const totalGeneral=totalVar+totalFijos;
@@ -1518,7 +1518,7 @@ function generarAnalisisCompleto(){
   txt+=`Bonificaciones:   ${fmt(totalBn)} (${bonifs.length} reg.) — NO ES GASTO\n`;
   txt+=`Efectivale:       ${fmt(totalEf)}\n`;
   txt+=`TAG casetas:      ${fmt(totalTag)}\n`;
-  txt+=`TOTAL EGRESOS:    ${fmt(totalOp+totalEf+totalTag+catalogoFijos.reduce((a,c)=>a+c.monto,0))}\n\n`;
+  txt+=`TOTAL EGRESOS:    ${fmt(totalOp+totalEf+totalTag+catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0))}\n\n`;
   const tipos=[...new Set([...gastos,...bonifs].map(m=>m.tipo))].sort();
   txt+=`DETALLE POR TIPO\n═══════════════════════════════════════════\n`;
   tipos.forEach(tipo=>{
