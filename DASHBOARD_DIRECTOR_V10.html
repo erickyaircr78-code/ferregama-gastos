@@ -494,13 +494,13 @@ $('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFecha'].forEach(id=>
 let movimientos=[],catalogoFijos=[],estadosFijos={},efectivaleRegs=[],tagRegs=[],fijosPagosV4=[];
 let chartCat=null,chartComp=null;
 function suscribir(){
-  db.collection('movimientos').orderBy('creadoEn','desc').onSnapshot(snap=>{
+  db.collection('movimientos').orderBy('fecha','desc').onSnapshot(snap=>{
     movimientos=snap.docs.map(d=>({id:d.id,...d.data()}));
     renderTodo();
     renderIndicadorSemanal();
     analizarAuto();
   });
-  db.collection('efectivale').orderBy('creadoEn','desc').onSnapshot(snap=>{
+  db.collection('efectivale').orderBy('fecha','desc').onSnapshot(snap=>{
     efectivaleRegs=snap.docs.map(d=>({id:d.id,...d.data()}));
     renderTodo();
   });
@@ -606,12 +606,17 @@ function renderTodo(){
   $('hBonifSub').textContent=`${bonifs.length} registros`;
   $('hSinComp').textContent=sinComp.length;
 
-  // Fijos V3 (Claudia) + Fijos V4 (Miriam/Nancy/Jennifer)
-  const mesStr=`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
-  const fijosV4Mes=fijosPagosV4.filter(p=>p.mes===mesStr);
+  // Fijos V3 (Claudia) + Fijos V4 (Miriam/Nancy/Jennifer) + V10
+  const mesStr=desde?desde.substring(0,7):`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  const fijosV4Mes=fijosPagosV4.filter(p=>{
+    const pMes=(p.mes||p.fecha||'').substring(0,7);
+    return pMes===mesStr;
+  });
   const fijosV4Total=fijosV4Mes.reduce((a,p)=>a+p.monto,0);
-  const fijosTotal=catalogoFijos.reduce((a,c)=>a+c.monto,0)+fijosV4Total;
-  const fijosPend=catalogoFijos.reduce((a,c)=>a+getSaldoFijo(c),0);
+  // Si hay compromisos configurados usarlos, si no mostrar solo lo pagado
+  const tieneCompromisos=catalogoFijos.some(c=>c.monto>0);
+  const fijosTotal=tieneCompromisos?catalogoFijos.reduce((a,c)=>a+c.monto,0)+fijosV4Total:fijosV4Total;
+  const fijosPend=tieneCompromisos?catalogoFijos.reduce((a,c)=>a+getSaldoFijo(c),0):0;
   $('hPend').textContent=fmt(fijosPend);
   $('hPendSub').textContent=`${MESES[mesAct]} ${anioAct}`;
 
