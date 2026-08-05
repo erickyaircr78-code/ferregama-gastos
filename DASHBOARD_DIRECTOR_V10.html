@@ -607,7 +607,8 @@ function renderTodo(){
   $('hSinComp').textContent=sinComp.length;
 
   // Fijos V3 (Claudia) + Fijos V4 (Miriam/Nancy/Jennifer) + V10
-  const mesStr=desde?desde.substring(0,7):`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+  const desdeF=$('fDesde').value;
+  const mesStr=desdeF?desdeF.substring(0,7):`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
   const fijosV4Mes=fijosPagosV4.filter(p=>{
     const pMes=(p.mes||p.fecha||'').substring(0,7);
     return pMes===mesStr;
