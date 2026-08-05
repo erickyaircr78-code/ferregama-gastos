@@ -493,6 +493,7 @@ $('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFecha'].forEach(id=>
 /* FIREBASE */
 let movimientos=[],catalogoFijos=[],estadosFijos={},efectivaleRegs=[],tagRegs=[],fijosPagosV4=[];
 let fijosCargados=false;
+let tagFilt=[];
 let chartCat=null,chartComp=null;
 function suscribir(){
   db.collection('movimientos').orderBy('fecha','desc').onSnapshot(snap=>{
@@ -634,7 +635,7 @@ function renderTodo(){
   const efectPorSuc=['CDMX','Morelos','Puebla'].map(s=>{const v=efectFilt.filter(r=>r.sucursal===s).reduce((a,r)=>a+r.cargo,0);return v>0?`${s} ${fmt(v)}`:null;}).filter(Boolean);
 
   // TAG
-  let tagFilt=tagRegs;
+  tagFilt=tagRegs;
   if(desde)tagFilt=tagFilt.filter(r=>(r.fecha||'').substring(0,10)>=desde);
   if(hasta)tagFilt=tagFilt.filter(r=>(r.fecha||'').substring(0,10)<=hasta);
   const totalTag=tagFilt.reduce((a,r)=>a+r.importe,0);
