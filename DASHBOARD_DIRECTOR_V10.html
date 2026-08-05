@@ -492,6 +492,7 @@ $('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFecha'].forEach(id=>
 
 /* FIREBASE */
 let movimientos=[],catalogoFijos=[],estadosFijos={},efectivaleRegs=[],tagRegs=[],fijosPagosV4=[];
+let fijosCargados=false;
 let chartCat=null,chartComp=null;
 function suscribir(){
   db.collection('movimientos').orderBy('fecha','desc').onSnapshot(snap=>{
@@ -512,6 +513,7 @@ function suscribir(){
   db.collection('fijos_estados').doc('global').onSnapshot(doc=>{estadosFijos=doc.exists?doc.data():{};renderTodo();});
   db.collection('fijos_pagos').onSnapshot(snap=>{
     fijosPagosV4=snap.docs.map(d=>({id:d.id,...d.data()}));
+    fijosCargados=true;
     renderTodo();
   });
 }
@@ -645,8 +647,10 @@ function renderTodo(){
   $('totalEfectDetBarra').textContent=efectPorSuc.length?efectPorSuc.join(' · '):'Sin recargas';
   $('totalTagBarra').textContent=fmt(totalTag);
   $('totalTagDetBarra').textContent=tagPorArea.length?tagPorArea.join(' · '):'Sin peajes';
-  $('totalFijosBarra').textContent=fmt(fijosTotal);
-  $('totalFijosPendBarra').textContent=`${fmt(fijosPend)} pendientes`;
+  if(fijosCargados){
+    $('totalFijosBarra').textContent=fmt(fijosTotal);
+    $('totalFijosPendBarra').textContent=`${fmt(fijosPend)} pendientes`;
+  }
   $('totalEgresosBarra').textContent=fmt(total+totalBonif+totalEfect+totalTag+fijosTotal);
 
   // categorías
