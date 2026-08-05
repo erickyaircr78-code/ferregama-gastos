@@ -618,9 +618,10 @@ function renderTodo(){
   });
   const fijosV4Total=fijosV4Mes.reduce((a,p)=>a+p.monto,0);
   // Si hay compromisos configurados usarlos, si no mostrar solo lo pagado
-  const tieneCompromisos=catalogoFijos.some(c=>c.monto>0);
-  const fijosTotal=tieneCompromisos?catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0)+fijosV4Total:fijosV4Total;
-  const fijosPend=tieneCompromisos?catalogoFijos.reduce((a,c)=>a+getSaldoFijo(c),0):0;
+  // catalogoFijos tiene conceptos históricos del V3/V4 — no sumar al total
+  // Solo mostrar fijosV4Total = pagos reales capturados en fijos_pagos
+  const fijosTotal=fijosV4Total;
+  const fijosPend=0;
   $('hPend').textContent=fmt(fijosPend);
   $('hPendSub').textContent=`${MESES[mesAct]} ${anioAct}`;
 
