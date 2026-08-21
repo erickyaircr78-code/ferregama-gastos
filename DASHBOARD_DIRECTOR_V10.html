@@ -652,8 +652,10 @@ function renderTodo(){
   if(fijosCargados){
     $('totalFijosBarra').textContent=fmt(fijosTotal);
     $('totalFijosPendBarra').textContent=`${fmt(fijosPend)} pendientes`;
+    $('totalEgresosBarra').textContent=fmt(total+totalBonif+totalEfect+totalTag+fijosTotal);
+  } else {
+    $('totalEgresosBarra').textContent=fmt(total+totalBonif+totalEfect+totalTag);
   }
-  $('totalEgresosBarra').textContent=fmt(total+totalBonif+totalEfect+totalTag+fijosTotal);
 
   // categorías
   renderAreas(gastos);
@@ -731,7 +733,7 @@ function renderTodo(){
 
 function renderDetalle(base){
   const t=$('dTipo').value,s=$('dSuc').value,fecha=$('dFecha').value;
-  const f=base.filter(m=>(!t||m.tipo===t)&&(!s||m.sucursal===s)&&(!fecha||m.fecha===fecha));
+  const f=base.filter(m=>(!t||(m.tipo||'')===t)&&(!s||(m.sucursal||'')===s)&&(!fecha||(m.fecha||'')===fecha));
   // agregar Efectivale al detalle
   const desde=$('fDesde').value;const hasta=$('fHasta').value;const sucF=$('fSuc').value;
   let efRows=[];
@@ -744,7 +746,7 @@ function renderDetalle(base){
   // agregar fijos al detalle
   let fijosRows=[];
   if(!t||t==='Gastos fijos'){
-    fijosRows=f.filter(m=>m.esFijo).filter(m=>{
+    fijosRows=f.filter(m=>m.esFijo&&(m.monto||0)>0).filter(m=>{
       const fe=(m.fecha||'').substring(0,10);
       return(!s||m.sucursal===s)&&(!fecha||fe===fecha);
     }).map(m=>({...m,_esFijo:true}));
@@ -1365,7 +1367,7 @@ function generarReporte(tipo){
     // Pagos fijos V4 (Miriam/Nancy/Jennifer)
     const fijosV4Rows=fijosPagosV4.filter(p=>(p.fecha||'')>='2026-06-29').map(p=>({
       fecha:(p.fecha||'').substring(0,10),
-      sucursal:p.sucursal||'',
+      sucursal:p.sucursal||p.zona||'General',
       capturista:p.capturista||'',
       tipo:'Gastos fijos',
       concepto:p.concepto||'',
@@ -1406,14 +1408,22 @@ function generarReporte(tipo){
 
 /* ─── INDICADOR SEMANAL SIN COMPROBANTE ─── */
 function renderIndicadorSemanal(){
-  const hoy=new Date();
-  // Calcular inicio de semana actual (lunes)
-  const diaSemana=hoy.getDay()===0?6:hoy.getDay()-1;
-  const lunes=new Date(hoy);lunes.setDate(hoy.getDate()-diaSemana);lunes.setHours(0,0,0,0);
-  const lunesISO=lunes.toISOString().split('T')[0];
-  const hoyISO2=hoy.toISOString().split('T')[0];
+  // Usar filtro activo si existe, si no usar semana actual
+  const desdeActivo=$('fDesde').value;
+  const hastaActivo=$('fHasta').value;
+  let lunesISO,hoyISO2;
+  if(desdeActivo&&hastaActivo){
+    lunesISO=desdeActivo;
+    hoyISO2=hastaActivo;
+  } else {
+    const hoy=new Date();
+    const diaSemana=hoy.getDay()===0?6:hoy.getDay()-1;
+    const lunes=new Date(hoy);lunes.setDate(hoy.getDate()-diaSemana);lunes.setHours(0,0,0,0);
+    lunesISO=lunes.toISOString().split('T')[0];
+    hoyISO2=hoy.toISOString().split('T')[0];
+  }
 
-  // Movimientos de esta semana (excluye bonificaciones, fijos, efectivale, tag)
+  // Movimientos de este periodo (excluye bonificaciones, fijos, efectivale, tag)
   const semMov=movimientos.filter(m=>{
     const f=m.fecha||'';
     return f>=lunesISO&&f<=hoyISO2&&
