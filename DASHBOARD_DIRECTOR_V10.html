@@ -1408,14 +1408,13 @@ function generarReporte(tipo){
 
 /* ─── INDICADOR SEMANAL SIN COMPROBANTE ─── */
 function renderIndicadorSemanal(){
-  // Usar filtro activo si existe, si no usar semana actual
   const desdeActivo=$('fDesde').value;
   const hastaActivo=$('fHasta').value;
   let lunesISO,hoyISO2;
   if(desdeActivo&&hastaActivo){
     lunesISO=desdeActivo;
     hoyISO2=hastaActivo;
-  } else {
+  }else{
     const hoy=new Date();
     const diaSemana=hoy.getDay()===0?6:hoy.getDay()-1;
     const lunes=new Date(hoy);lunes.setDate(hoy.getDate()-diaSemana);lunes.setHours(0,0,0,0);
@@ -1423,89 +1422,86 @@ function renderIndicadorSemanal(){
     hoyISO2=hoy.toISOString().split('T')[0];
   }
 
-  // Movimientos de este periodo (excluye bonificaciones, fijos, efectivale, tag)
+  // Movimientos del periodo (excluye bonificaciones)
   const semMov=movimientos.filter(m=>{
     const f=m.fecha||'';
-    return f>=lunesISO&&f<=hoyISO2&&
-      m.tipo!=='Bonificación a cliente'&&
-      !m.esFijo&&!m.esEfectivale&&!m.esTag;
+    return f>=lunesISO&&f<=hoyISO2&&m.tipo!=='Bonificación a cliente';
   });
 
-  if(!semMov.length){
-    $('indicadorGrid').innerHTML='<div style="font-size:12px;color:var(--muted);grid-column:1/-1;">Sin movimientos esta semana.</div>';
-    $('semanaLabel').textContent=`Semana: ${lunesISO} al ${hoyISO2}`;
+  const total=semMov.length;
+
+  if(!total){
+    $('indicadorGrid').innerHTML='<div style="font-size:12px;color:var(--muted);grid-column:1/-1;">Sin movimientos en el periodo.</div>';
+    $('semanaLabel').textContent=`Periodo: ${lunesISO} al ${hoyISO2}`;
     return;
   }
 
-  const totalSem=semMov.length;
-  const totalMonto=semMov.reduce((a,m)=>a+m.monto,0);
-  const sinComp=semMov.filter(m=>!m.comprobante&&!m.causaRaiz);
-  const pct=totalSem>0?((sinComp.length/totalSem)*100).toFixed(1):0;
-  const montoSC=sinComp.reduce((a,m)=>a+m.monto,0);
+  // 3 categorías
+  const sinFotoNiCausa=semMov.filter(m=>!m.comprobante&&!m.causaRaiz);
+  const sinFotoConCausa=semMov.filter(m=>!m.comprobante&&m.causaRaiz);
+  const conFoto=semMov.filter(m=>m.comprobante);
+  const pctGrave=((sinFotoNiCausa.length/total)*100).toFixed(1);
+  const pctJust=((sinFotoConCausa.length/total)*100).toFixed(1);
+  const pctOk=((conFoto.length/total)*100).toFixed(1);
 
-  // Por sucursal
-  const SUCS=['CDMX','Morelos','Puebla'];
-  const porSuc=SUCS.map(s=>{
-    const movs=semMov.filter(m=>m.sucursal===s);
-    const sc=movs.filter(m=>!m.comprobante&&!m.causaRaiz);
-    const pctS=movs.length>0?((sc.length/movs.length)*100).toFixed(1):0;
-    return{suc:s,total:movs.length,sc:sc.length,pct:pctS,monto:sc.reduce((a,m)=>a+m.monto,0)};
-  }).filter(x=>x.total>0);
+  const fmt2=n=>new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(n||0);
 
-  // Por capturista
-  const porCap={};
-  semMov.forEach(m=>{
-    const cap=m.capturista||'?';
-    if(!porCap[cap])porCap[cap]={total:0,sc:0,monto:0};
-    porCap[cap].total++;
-    if(!m.comprobante&&!m.causaRaiz){porCap[cap].sc++;porCap[cap].monto+=m.monto;}
-  });
-
-  // Color semáforo
-  const colorPct=pct==0?'var(--ok)':pct<=10?'var(--warn)':'var(--danger)';
-  const bgPct=pct==0?'var(--ok-bg)':pct<=10?'var(--warn-bg)':'#fdecea';
-
-  let html=`
-    <div style="background:${bgPct};border-radius:8px;padding:12px 14px;text-align:center;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">% sin comprobante</div>
-      <div style="font-size:24px;font-weight:800;color:${colorPct};">${pct}%</div>
-      <div style="font-size:10px;color:var(--muted);">${sinComp.length} de ${totalSem} mov.</div>
+  // KPIs globales
+  let html=`<div style="grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+    <div style="background:#fdecea;border-radius:8px;padding:10px 12px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:#c0392b;margin-bottom:3px;">Sin foto ni causa ⚠</div>
+      <div style="font-size:20px;font-weight:800;color:#c0392b;">${pctGrave}%</div>
+      <div style="font-size:10px;color:#c0392b;">${sinFotoNiCausa.length} de ${total}</div>
     </div>
-    <div style="background:var(--field);border-radius:8px;padding:12px 14px;text-align:center;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:4px;">Monto sin comprobar</div>
-      <div style="font-size:18px;font-weight:800;color:${sinComp.length?'var(--danger)':'var(--ok)'};">${fmt(montoSC)}</div>
-      <div style="font-size:10px;color:var(--muted);">${fmt(totalMonto)} total semana</div>
-    </div>`;
+    <div style="background:var(--warn-bg);border-radius:8px;padding:10px 12px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--warn);margin-bottom:3px;">Sin foto + causa raíz</div>
+      <div style="font-size:20px;font-weight:800;color:var(--warn);">${pctJust}%</div>
+      <div style="font-size:10px;color:var(--warn);">${sinFotoConCausa.length} — justificados</div>
+    </div>
+    <div style="background:var(--ok-bg);border-radius:8px;padding:10px 12px;text-align:center;">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--ok);margin-bottom:3px;">Con foto ✓</div>
+      <div style="font-size:20px;font-weight:800;color:var(--ok);">${pctOk}%</div>
+      <div style="font-size:10px;color:var(--ok);">${conFoto.length} movimientos</div>
+    </div>
+  </div>`;
 
   // Por sucursal
-  porSuc.forEach(x=>{
-    const col=x.suc==='CDMX'?'#1F4E79':x.suc==='Morelos'?'#375623':'#7B2C2C';
-    const bg=x.suc==='CDMX'?'#DEEAF1':x.suc==='Morelos'?'#E2EFDA':'#FCE4D6';
-    const cp=x.pct==0?'var(--ok)':x.pct<=15?'var(--warn)':'var(--danger)';
-    html+=`<div style="background:${bg};border-radius:8px;padding:12px 14px;text-align:center;">
-      <div style="font-size:11px;font-weight:700;color:${col};margin-bottom:4px;">${x.suc}</div>
-      <div style="font-size:18px;font-weight:800;color:${cp};">${x.pct}%</div>
-      <div style="font-size:10px;color:var(--muted);">${x.sc} sin comp / ${x.total} mov.</div>
+  const SUCS=[
+    {s:'CDMX',color:'#1F4E79',bg:'#DEEAF1'},
+    {s:'Morelos',color:'#375623',bg:'#E2EFDA'},
+    {s:'Puebla',color:'#7B2C2C',bg:'#FCE4D6'}
+  ];
+
+  SUCS.forEach(({s,color,bg})=>{
+    const movs=semMov.filter(m=>m.sucursal===s);
+    if(!movs.length)return;
+    const grave=movs.filter(m=>!m.comprobante&&!m.causaRaiz).length;
+    const just=movs.filter(m=>!m.comprobante&&m.causaRaiz).length;
+    const foto=movs.filter(m=>m.comprobante).length;
+    const pctBar=movs.length>0?(((grave+just)/movs.length)*100).toFixed(0):0;
+    html+=`<div style="background:var(--surface-1);border-radius:8px;padding:10px 12px;border-left:3px solid ${color};">
+      <div style="font-size:11px;font-weight:700;color:${color};margin-bottom:6px;">${s} <span style="font-size:10px;font-weight:400;color:var(--muted);">${movs.length} movs</span></div>
+      <div style="height:5px;border-radius:3px;background:var(--line);margin-bottom:6px;overflow:hidden;">
+        <div style="height:100%;width:${pctBar}%;background:${parseInt(pctBar)>30?'#c0392b':'#c07a00'};border-radius:3px;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">
+        <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#c0392b;margin-right:3px;"></span>Sin foto ni causa</span>
+        <span style="font-weight:700;color:#c0392b;">${grave}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;margin-bottom:2px;">
+        <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#c07a00;margin-right:3px;"></span>Sin foto + causa</span>
+        <span style="font-weight:700;color:#c07a00;">${just}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;">
+        <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#2e7d45;margin-right:3px;"></span>Con foto</span>
+        <span style="font-weight:700;color:#2e7d45;">${foto}</span>
+      </div>
     </div>`;
   });
-
-  // Por capturista (top 3 con más sin comprobante)
-  const capList=Object.entries(porCap).filter(([,v])=>v.sc>0).sort((a,b)=>b[1].sc-a[1].sc).slice(0,3);
-  if(capList.length){
-    const capHTML=capList.map(([cap,v])=>`<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);font-size:11px;">
-      <span style="font-weight:600;">${cap}</span>
-      <span style="color:var(--danger);">${v.sc} sin comp · ${fmt(v.monto)}</span>
-    </div>`).join('');
-    html+=`<div style="background:var(--field);border-radius:8px;padding:12px 14px;grid-column:span 2;">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px;">Por capturista</div>
-      ${capHTML}
-    </div>`;
-  }
 
   $('indicadorGrid').innerHTML=html;
-  $('semanaLabel').textContent=`Semana: ${lunesISO} al ${hoyISO2}`;
+  $('semanaLabel').textContent=`Periodo: ${lunesISO} al ${hoyISO2} · ${total} movimientos`;
 }
-
 
 function generarAnalisisCompleto(){
   const f=filtrar();
