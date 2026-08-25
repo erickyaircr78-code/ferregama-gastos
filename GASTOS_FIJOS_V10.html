@@ -394,7 +394,7 @@ let conceptoFinal=null;
 let editandoId=null;
 
 // Usuarios que NO necesitan selector de zona (su zona es automática)
-function esSoloZona(){return sesion&&sesion.rol==='capturista'&&sesion.sucursal&&sesion.sucursal!=='todas';}
+function esSoloZona(){return sesion&&sesion.rol==='capturista'&&sesion.user!=='claudia'&&sesion.sucursal&&sesion.sucursal!=='todas';}
 function miZona(){return sesion?sesion.sucursal:'';}
 function esAdmin(){return sesion&&(sesion.rol==='admin'||sesion.user==='erick');}
 
