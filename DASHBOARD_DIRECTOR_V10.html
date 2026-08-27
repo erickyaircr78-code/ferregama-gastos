@@ -133,6 +133,10 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .table-wrap{overflow-x:auto;max-height:420px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;}
 table{width:100%;border-collapse:collapse;font-size:12.5px;}
 th{text-align:left;padding:8px 7px;background:var(--field);color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--line);position:sticky;top:0;z-index:1;}
+th.th-sort{cursor:pointer;user-select:none;}
+th.th-sort:hover{color:var(--ink);}
+.sort-arrow{font-size:9px;margin-left:3px;opacity:.35;}
+.sort-arrow.active{opacity:1;color:var(--accent);}
 td{padding:8px 7px;border-bottom:1px solid var(--line);}
 tr:hover td{background:#faf8f3;}
 .ac{font-weight:800;text-align:right;}
@@ -383,7 +387,7 @@ tr:hover td{background:#faf8f3;}
           <option>Viáticos/Foráneas</option><option>Custodia/Seguridad</option><option>Oficina/Papelería/Bodega</option>
           <option>Servicios (luz/agua/internet)</option><option>Local: limpieza/mantto</option>
           <option>Préstamo/Faltante a personal</option><option>Dirección/Socios</option>
-          <option>Salud/Farmacia</option><option>Otros/Revisar</option>
+          <option>Salud/Farmacia</option><option>Policía</option><option>Otros/Revisar</option>
         </select>
         <select id="dSuc" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Todas las sucursales</option><option>CDMX</option><option>Morelos</option><option>Puebla</option></select>
         <input type="date" id="dFecha" style="width:auto;font-size:12px;padding:7px 10px;">
@@ -391,7 +395,16 @@ tr:hover td{background:#faf8f3;}
       </div>
     </div>
     <div class="table-wrap">
-      <table><thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Sucursal</th><th>Persona</th><th>Concepto</th><th style="text-align:right;">Monto</th><th>Autoriza</th><th>Comp.</th><th>Capturó</th></tr></thead>
+      <table><thead><tr>
+        <th class="th-sort" onclick="ordenarDetalle('fecha')">Fecha<span class="sort-arrow" id="arrow-fecha"></span></th>
+        <th class="th-sort" onclick="ordenarDetalle('hora')">Hora<span class="sort-arrow" id="arrow-hora"></span></th>
+        <th class="th-sort" onclick="ordenarDetalle('tipo')">Tipo<span class="sort-arrow" id="arrow-tipo"></span></th>
+        <th class="th-sort" onclick="ordenarDetalle('sucursal')">Sucursal<span class="sort-arrow" id="arrow-sucursal"></span></th>
+        <th class="th-sort" onclick="ordenarDetalle('persona')">Persona<span class="sort-arrow" id="arrow-persona"></span></th>
+        <th class="th-sort" onclick="ordenarDetalle('concepto')">Concepto<span class="sort-arrow" id="arrow-concepto"></span></th>
+        <th class="th-sort ac" onclick="ordenarDetalle('monto')" style="text-align:right;">Monto<span class="sort-arrow" id="arrow-monto"></span></th>
+        <th>Autoriza</th><th>Comp.</th><th>Capturó</th>
+      </tr></thead>
       <tbody id="tbDetalle"></tbody></table>
     </div>
   </div>
@@ -404,7 +417,10 @@ if(window.location.protocol==='file:')document.getElementById('fileAlert').style
 const FB={apiKey:"AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",authDomain:"ferregama-gastos.firebaseapp.com",projectId:"ferregama-gastos",storageBucket:"ferregama-gastos.firebasestorage.app",messagingSenderId:"561677307493",appId:"1:561677307493:web:adb5284746c1dac3e3408c"};
 firebase.initializeApp(FB);
 const db=firebase.firestore();
-db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+// Persistencia offline desactivada a propósito (26-ago-2026): el Dashboard es de solo lectura,
+// no necesita funcionar sin internet, y esta línea era la fuente posible del error
+// "Failed to obtain primary lease" cuando Pepe tenía Dashboard + Planilla abiertos a la vez.
+// db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
 
 let sesion=null;
 const $=id=>document.getElementById(id);
@@ -416,7 +432,7 @@ const hoy=new Date(),mesAct=hoy.getMonth(),anioAct=hoy.getFullYear();
 function hoyISO(){const d=new Date(),o=d.getTimezoneOffset();return new Date(d.getTime()-o*60000).toISOString().split('T')[0];}
 // fecha se actualiza en renderTodo()
 
-function bdg(t){const m={'Bonificación a cliente':'bonif','Bono/Extra a personal':'bono','Nómina/Sueldos':'nom','Vehículos: mantenimiento':'mantto','Vehículos: casetas/estac/talacha':'cas','Viáticos/Foráneas':'viat','Custodia/Seguridad':'cust','Oficina/Papelería/Bodega':'of','Servicios (luz/agua/internet)':'serv','Local: limpieza/mantto':'limp','Préstamo/Faltante a personal':'prest','Dirección/Socios':'dir','Salud/Farmacia':'sal','Otros/Revisar':'ot'};return `badge b-${m[t]||'ot'}`;}
+function bdg(t){const m={'Bonificación a cliente':'bonif','Bono/Extra a personal':'bono','Nómina/Sueldos':'nom','Vehículos: mantenimiento':'mantto','Vehículos: casetas/estac/talacha':'cas','Viáticos/Foráneas':'viat','Custodia/Seguridad':'cust','Oficina/Papelería/Bodega':'of','Servicios (luz/agua/internet)':'serv','Local: limpieza/mantto':'limp','Préstamo/Faltante a personal':'prest','Dirección/Socios':'dir','Salud/Farmacia':'sal','Policía':'ot','Otros/Revisar':'ot'};return `badge b-${m[t]||'ot'}`;}
 
 /* LOGIN — solo admins y viewer */
 $('loginBtn').addEventListener('click',doLogin);
@@ -487,6 +503,21 @@ $('semBtn').addEventListener('click',()=>{
   $('fDesde').value=fmt2(lun);$('fHasta').value=fmt2(dom);renderTodo();
 });
 $('clearBtn').addEventListener('click',()=>{['fSuc','fDesde','fHasta'].forEach(id=>$(id).value='');renderTodo();});
+let sortCol=null,sortDir=1;
+
+function ordenarDetalle(col){
+  if(sortCol===col){sortDir*=-1;}else{sortCol=col;sortDir=1;}
+  renderDetalle(filtrar());
+}
+function actualizarFlechasOrden(){
+  ['fecha','hora','tipo','sucursal','persona','concepto','monto'].forEach(c=>{
+    const el=$('arrow-'+c);
+    if(!el)return;
+    if(sortCol===c){el.textContent=sortDir===1?'▲':'▼';el.classList.add('active');}
+    else{el.textContent='▾';el.classList.remove('active');}
+  });
+}
+
 ['dTipo','dSuc','dFecha'].forEach(id=>$(id).addEventListener('change',()=>renderDetalle(filtrar())));
 $('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFecha'].forEach(id=>$(id).value='');renderDetalle(filtrar());});
 
@@ -769,7 +800,27 @@ function renderDetalle(base){
   if(!t||t==='TAG'){
     tagRows=tagFilt.map(r=>({...r,tipo:'TAG',monto:r.importe,persona:r.nombre,concepto:`TAG ${r.tag} · ${r.caseta||''}`,sucursal:r.area==='Ventas'?'Ventas':'Operación',_esTag:true,fecha:(r.fecha||'').substring(0,10)}));
   }
-  const todos=[...f.filter(m=>!m.esFijo),...efRows,...fijosRows,...tagRows].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  let todos=[...f.filter(m=>!m.esFijo),...efRows,...fijosRows,...tagRows];
+  const sortGetters={
+    fecha:m=>m.fecha||'',
+    hora:m=>m.creadoEn&&m.creadoEn.toDate?m.creadoEn.toDate().getTime():0,
+    tipo:m=>m.tipo||'',
+    sucursal:m=>m.sucursal||'',
+    persona:m=>m.persona||'',
+    concepto:m=>m.concepto||'',
+    monto:m=>Number(m.monto)||0
+  };
+  if(sortCol&&sortGetters[sortCol]){
+    todos.sort((a,b)=>{
+      const va=sortGetters[sortCol](a),vb=sortGetters[sortCol](b);
+      if(va<vb)return -1*sortDir;
+      if(va>vb)return 1*sortDir;
+      return 0;
+    });
+  }else{
+    todos.sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  }
+  actualizarFlechasOrden();
   const tb=$('tbDetalle');
   if(!todos.length){tb.innerHTML='<tr class="erow"><td colspan="10">Sin movimientos.</td></tr>';return;}
   tb.innerHTML=todos.map(m=>{
