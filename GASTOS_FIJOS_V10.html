@@ -306,7 +306,7 @@ tr:hover td{background:#fafaf8;}
           </select>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:16px;align-items:end;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
         <div>
           <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Zona</label>
           <select id="nuevaZona" style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
@@ -317,7 +317,14 @@ tr:hover td{background:#fafaf8;}
             <option value="General">General</option>
           </select>
         </div>
-        <button class="btn-guardar" style="margin:0;" onclick="agregarConcepto()">Agregar</button>
+        <div>
+          <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Monto mensual (aprox. si varía)</label>
+          <input type="number" id="nuevoMonto" placeholder="0.00" step="0.01" min="0" style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="btn-guardar" id="btnGuardarConcepto" style="margin:0;flex:1;" onclick="guardarConcepto()">Agregar</button>
+        <button class="btn-sec" id="btnCancelarEdicion" style="margin:0;display:none;" onclick="cancelarEdicionConcepto()">Cancelar</button>
       </div>
         <div id="listaCatalogo"></div>
       </div>
@@ -545,7 +552,7 @@ function construirBotones(){
   }
 
   // ── CONCEPTOS PERSONALIZADOS DEL CATÁLOGO ──
-  const personalizados=catalogo.filter(cx=>cx.personalizado===true);
+  const personalizados=catalogo.filter(cx=>cx.personalizado===true&&cx.activo!==false);
   if(personalizados.length){
     const grpNomina=personalizados.filter(cx=>cx.seccion==='nomina');
     const grpServicios=personalizados.filter(cx=>cx.seccion==='servicios');
@@ -880,38 +887,106 @@ function verComprobante(id){
 function renderCatalogo(){
   const lista=$('listaCatalogo');
   if(!catalogo.length){lista.innerHTML='<div class="empty">Sin conceptos en el catálogo.</div>';return;}
-  lista.innerHTML=catalogo.map(c=>`
-    <div class="cat-item">
-      <span style="font-size:13px;font-weight:600;">${c.concepto}</span>
-      ${esAdmin()||sesion.user==='claudia'?`<button class="ibtn" onclick="eliminarConcepto('${c.id}','${c.concepto.replace(/'/g,"\\'")}')">✕</button>`:''}
-    </div>`).join('');
+  const puedeEditar=esAdmin()||sesion.user==='claudia';
+  lista.innerHTML=catalogo.map(c=>{
+    const inactivo=c.activo===false;
+    const detalle=[c.sucursal||c.zona||'Sin zona',c.monto?fmt(c.monto):'Sin monto'].join(' · ');
+    return `
+    <div class="cat-item" style="${inactivo?'opacity:.5;':''}">
+      <div>
+        <span style="font-size:13px;font-weight:600;">${c.concepto}</span>${inactivo?' <span style="font-size:10px;color:var(--danger);font-weight:700;">INACTIVO</span>':''}
+        <div style="font-size:11px;color:var(--muted);">${detalle}</div>
+      </div>
+      ${puedeEditar?`<div style="display:flex;gap:4px;">
+        <button class="ibtn" title="Editar" onclick="editarConcepto('${c.id}')">✎</button>
+        <button class="ibtn" title="${inactivo?'Reactivar':'Dar de baja'}" onclick="toggleActivoConcepto('${c.id}',${c.activo!==false},'${c.concepto.replace(/'/g,"\\'")}')">${inactivo?'↺':'⏻'}</button>
+        <button class="ibtn" title="Eliminar permanentemente" onclick="eliminarConcepto('${c.id}','${c.concepto.replace(/'/g,"\\'")}')">✕</button>
+      </div>`:''}
+    </div>`;
+  }).join('');
 }
 
-async function agregarConcepto(){
+async function guardarConcepto(){
   const nombre=$('nuevoConc').value.trim();
   const seccion=$('nuevaSeccion')?$('nuevaSeccion').value:'servicios';
-  const zona=$('nuevaZona')?$('nuevaZona').value:'';
+  const sucursal=$('nuevaZona')?$('nuevaZona').value:'';
+  const monto=parseFloat($('nuevoMonto').value)||0;
   if(!nombre){toast('Escribe el nombre del concepto.');return;}
   if(!seccion){toast('Selecciona la sección.');return;}
+  const conZona=['nomina','servicios'].includes(seccion);
+
+  if(editandoId){
+    // ── MODO EDITAR: corrige un concepto existente sin perder su historial de pagos/estados ──
+    try{
+      await db.collection('fijos_catalogo').doc(editandoId).update({
+        concepto:nombre,
+        seccion:seccion,
+        sucursal:sucursal||'',
+        zona:sucursal||'', // se mantiene por compatibilidad, ya no se usa para nada nuevo
+        monto:monto,
+        conZona:conZona,
+        editadoPor:sesion.user,
+        editadoEn:firebase.firestore.FieldValue.serverTimestamp()
+      });
+      toast(`✓ "${nombre}" actualizado.`);
+      cancelarEdicionConcepto();
+    }catch(e){toast('Error al guardar los cambios.');}
+    return;
+  }
+
+  // ── MODO AGREGAR: concepto nuevo ──
   const existe=catalogo.find(c=>c.concepto.toLowerCase()===nombre.toLowerCase());
   if(existe){toast('Ese concepto ya existe.');return;}
-  const conZona=['nomina','servicios'].includes(seccion);
   try{
     await db.collection('fijos_catalogo').add({
       concepto:nombre,
       seccion:seccion,
-      zona:zona||'',
+      sucursal:sucursal||'',
+      zona:sucursal||'',
+      monto:monto,
       conZona:conZona,
+      activo:true,
       semanal:false,
       orden:catalogo.length+1,
       agregadoPor:sesion.user,
       personalizado:true,
       creadoEn:firebase.firestore.FieldValue.serverTimestamp()
     });
-    $('nuevoConc').value='';
+    $('nuevoConc').value='';$('nuevoMonto').value='';
     toast(`✓ "${nombre}" agregado en ${seccion}.`);
     // construirBotones se llama automáticamente por el onSnapshot
   }catch(e){toast('Error al agregar.');}
+}
+
+function editarConcepto(id){
+  const c=catalogo.find(x=>x.id===id);
+  if(!c)return;
+  editandoId=id;
+  $('nuevoConc').value=c.concepto||'';
+  if($('nuevaSeccion'))$('nuevaSeccion').value=c.seccion||'servicios';
+  if($('nuevaZona'))$('nuevaZona').value=c.sucursal||c.zona||'';
+  $('nuevoMonto').value=c.monto||'';
+  $('btnGuardarConcepto').textContent='Guardar cambios';
+  $('btnCancelarEdicion').style.display='inline-block';
+  $('nuevoConc').scrollIntoView({behavior:'smooth',block:'center'});
+}
+
+function cancelarEdicionConcepto(){
+  editandoId=null;
+  $('nuevoConc').value='';$('nuevoMonto').value='';
+  if($('nuevaZona'))$('nuevaZona').value='';
+  $('btnGuardarConcepto').textContent='Agregar';
+  $('btnCancelarEdicion').style.display='none';
+}
+
+async function toggleActivoConcepto(id,activoActual,nombre){
+  const nuevoEstado=!activoActual;
+  const accion=nuevoEstado?'reactivar':'dar de baja';
+  if(!confirm(`¿${nuevoEstado?'Reactivar':'Dar de baja'} "${nombre}"? ${nuevoEstado?'Volverá a aparecer como botón de captura.':'Ya no aparecerá como botón de captura, pero conserva su historial de pagos.'}`))return;
+  try{
+    await db.collection('fijos_catalogo').doc(id).update({activo:nuevoEstado});
+    toast(`"${nombre}" ${nuevoEstado?'reactivado':'dado de baja'}.`);
+  }catch(e){toast(`Error al ${accion}.`);}
 }
 
 async function eliminarConcepto(id,nombre){
