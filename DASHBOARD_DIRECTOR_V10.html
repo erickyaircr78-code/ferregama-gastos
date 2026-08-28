@@ -135,7 +135,7 @@ table{width:100%;border-collapse:collapse;font-size:12.5px;}
 th{text-align:left;padding:8px 7px;background:var(--field);color:var(--muted);font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--line);position:sticky;top:0;z-index:1;}
 th.th-sort{cursor:pointer;user-select:none;}
 th.th-sort:hover{color:var(--ink);}
-.sort-arrow{font-size:9px;margin-left:3px;opacity:.35;}
+.sort-arrow{font-size:9px;margin-left:3px;opacity:.65;}
 .sort-arrow.active{opacity:1;color:var(--accent);}
 td{padding:8px 7px;border-bottom:1px solid var(--line);}
 tr:hover td{background:#faf8f3;}
@@ -390,7 +390,8 @@ tr:hover td{background:#faf8f3;}
           <option>Salud/Farmacia</option><option>Policía</option><option>Otros/Revisar</option>
         </select>
         <select id="dSuc" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Todas las sucursales</option><option>CDMX</option><option>Morelos</option><option>Puebla</option></select>
-        <input type="date" id="dFecha" style="width:auto;font-size:12px;padding:7px 10px;">
+        <input type="date" id="dFechaDesde" title="Desde" style="width:auto;font-size:12px;padding:7px 10px;">
+        <input type="date" id="dFechaHasta" title="Hasta" style="width:auto;font-size:12px;padding:7px 10px;">
         <button class="btn-sec" id="dClear" style="font-size:11px;">Limpiar</button>
       </div>
     </div>
@@ -518,8 +519,8 @@ function actualizarFlechasOrden(){
   });
 }
 
-['dTipo','dSuc','dFecha'].forEach(id=>$(id).addEventListener('change',()=>renderDetalle(filtrar())));
-$('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFecha'].forEach(id=>$(id).value='');renderDetalle(filtrar());});
+['dTipo','dSuc','dFechaDesde','dFechaHasta'].forEach(id=>$(id).addEventListener('change',()=>renderDetalle(filtrar())));
+$('dClear').addEventListener('click',()=>{['dTipo','dSuc','dFechaDesde','dFechaHasta'].forEach(id=>$(id).value='');renderDetalle(filtrar());});
 
 /* FIREBASE */
 let movimientos=[],catalogoFijos=[],estadosFijos={},efectivaleRegs=[],tagRegs=[],fijosPagosV4=[];
@@ -776,30 +777,35 @@ function renderTodo(){
 }
 
 function renderDetalle(base){
-  const t=$('dTipo').value,s=$('dSuc').value,fecha=$('dFecha').value;
-  const f=base.filter(m=>(!t||(m.tipo||'')===t)&&(!s||(m.sucursal||'')===s)&&(!fecha||(m.fecha||'')===fecha));
+  const t=$('dTipo').value,s=$('dSuc').value,fD=$('dFechaDesde').value,fH=$('dFechaHasta').value;
+  const f=base.filter(m=>(!t||(m.tipo||'')===t)&&(!s||(m.sucursal||'')===s)&&(!fD||(m.fecha||'')>=fD)&&(!fH||(m.fecha||'')<=fH));
   // agregar Efectivale al detalle
   const desde=$('fDesde').value;const hasta=$('fHasta').value;const sucF=$('fSuc').value;
   let efRows=[];
   if(!t||t==='Vehículos: gasolina'){
     efRows=efectivaleRegs.filter(r=>{
       const fe=(r.fecha||'').substring(0,10);
-      return(!sucF||r.sucursal===sucF)&&(!desde||fe>=desde)&&(!hasta||fe<=hasta)&&(!fecha||fe===fecha)&&(!s||r.sucursal===s);
+      return(!sucF||r.sucursal===sucF)&&(!desde||fe>=desde)&&(!hasta||fe<=hasta)&&(!fD||fe>=fD)&&(!fH||fe<=fH)&&(!s||r.sucursal===s);
     }).map(r=>({...r,tipo:'Vehículos: gasolina',monto:r.cargo,persona:r.chofer,concepto:`Efectivale · ${r.producto||''} · ${r.concepto||''}`,comprobante:null,causaRaiz:'',autorizado:'',_esEfect:true}));
   }
   // agregar fijos al detalle
   let fijosRows=[];
-  if(!t||t==='Gastos fijos'){
+  {
     const dDesde=$('fDesde').value,dHasta=$('fHasta').value;
     fijosRows=fijosPagosV4.filter(p=>{
       const fe=(p.fecha||'').substring(0,10);
-      return(!s||p.sucursal===s)&&(!fecha||fe===fecha)&&(!dDesde||fe>=dDesde)&&(!dHasta||fe<=dHasta);
+      const tipoReal=p.tipo||'Gastos fijos';
+      return(!t||tipoReal===t)&&(!s||p.sucursal===s)&&(!fD||fe>=fD)&&(!fH||fe<=fH)&&(!dDesde||fe>=dDesde)&&(!dHasta||fe<=dHasta);
     }).map(p=>({...p,tipo:p.tipo||'Gastos fijos',_esFijo:true}));
   }
   // agregar TAG al detalle
   let tagRows=[];
   if(!t||t==='TAG'){
-    tagRows=tagFilt.map(r=>({...r,tipo:'TAG',monto:r.importe,persona:r.nombre,concepto:`TAG ${r.tag} · ${r.caseta||''}`,sucursal:r.area==='Ventas'?'Ventas':'Operación',_esTag:true,fecha:(r.fecha||'').substring(0,10)}));
+    tagRows=tagFilt.filter(r=>{
+      const fe=(r.fecha||'').substring(0,10);
+      const sucTag=r.area==='Ventas'?'Ventas':'Operación';
+      return(!s||sucTag===s)&&(!fD||fe>=fD)&&(!fH||fe<=fH);
+    }).map(r=>({...r,tipo:'TAG',monto:r.importe,persona:r.nombre,concepto:`TAG ${r.tag} · ${r.caseta||''}`,sucursal:r.area==='Ventas'?'Ventas':'Operación',_esTag:true,fecha:(r.fecha||'').substring(0,10)}));
   }
   let todos=[...f.filter(m=>!m.esFijo),...efRows,...fijosRows,...tagRows];
   const sortGetters={
