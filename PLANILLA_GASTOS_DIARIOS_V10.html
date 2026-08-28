@@ -1005,7 +1005,7 @@ function leerXLSEfectivale(file){
           const precioLitro=parseFloat(fila[14])||0;
           const litros=parseFloat(fila[17])||0;
           if(!cuenta||cargo<=0)continue;
-          const cat=CATALOGO_TARJETAS[cuenta]||{sucursal:'Sin asignar',tipo:'SIN CLASIFICAR'};
+          const cat=catalogoTarjetasDB[cuenta]||CATALOGO_TARJETAS[cuenta]||{sucursal:'Sin asignar',tipo:'SIN CLASIFICAR'};
           registros.push({cuenta,fecha,cargo,chofer,concepto,producto,precioLitro,litros,sucursal:cat.sucursal,tipoGasto:cat.tipo});
         }
         resolve(registros);
@@ -1030,7 +1030,17 @@ function mostrarResumenEfectivale(){
       <span><strong>${s.sucursal}</strong> · ${s.tipo}</span>
       <span>${fmt(s.cargo)} · ${s.litros.toFixed(1)} L · ${s.registros} reg.</span>
     </div>`).join('');
-  if(sinAsignar>0)html+=`<div style="color:var(--warn);margin-top:6px;font-size:10px;">⚠ ${sinAsignar} tarjeta(s) sin clasificar en el catálogo — se guardarán como "Sin asignar"</div>`;
+  // Listar cada tarjeta sin clasificar por separado, con botón para asignarla de una vez
+  const cuentasSinAsignar=[...new Set(efectRegistros.filter(r=>r.sucursal==='Sin asignar').map(r=>r.cuenta))];
+  if(cuentasSinAsignar.length){
+    html+=`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);">
+      <div style="color:var(--warn);font-size:10px;font-weight:700;margin-bottom:6px;">⚠ ${cuentasSinAsignar.length} tarjeta(s) sin clasificar — asígnalas para que no vuelvan a salir así:</div>
+      ${cuentasSinAsignar.map(cta=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+        <span style="font-family:monospace;font-size:11px;">${cta}</span>
+        <button class="btn-sec" style="font-size:10px;padding:4px 10px;" onclick="asignarTarjeta('${cta}')">Asignar</button>
+      </div>`).join('')}
+    </div>`;
+  }
   html+=`<div style="margin-top:8px;font-weight:800;font-size:12px;">Total: ${fmt(efectRegistros.reduce((a,r)=>a+r.cargo,0))} · ${efectRegistros.reduce((a,r)=>a+r.litros,0).toFixed(1)} L · ${efectRegistros.length} registros</div>`;
   $('efectResumen').innerHTML=html;
   $('efectPreview').style.display='block';
@@ -1206,7 +1216,7 @@ function guardarCap(n){if(!n)return;let l=JSON.parse(localStorage.getItem('fg_ca
 guardarCap(null);
 
 /* FIREBASE */
-let movimientos=[],efectivaleTodos=[],tagTodos=[];
+let movimientos=[],efectivaleTodos=[],tagTodos=[],catalogoTagDB={},catalogoTarjetasDB={};
 function suscribir(){
   db.collection('movimientos').orderBy('creadoEn','desc').onSnapshot(snap=>{
     movimientos=snap.docs.map(d=>({id:d.id,...d.data()}));
@@ -1222,6 +1232,15 @@ function suscribir(){
     tagTodos=snap.docs.map(d=>({id:d.id,...d.data()}));
     renderMis();
     if(document.querySelector('.nav-btn[data-view="consolidado"]').classList.contains('active'))renderCons();
+  },err=>console.error(err));
+  // Catálogos dinámicos — una vez asignados aquí, las próximas cargas ya no salen "sin asignar"
+  db.collection('catalogo_tag').onSnapshot(snap=>{
+    catalogoTagDB={};
+    snap.docs.forEach(d=>{catalogoTagDB[d.id]=d.data();});
+  },err=>console.error(err));
+  db.collection('catalogo_tarjetas').onSnapshot(snap=>{
+    catalogoTarjetasDB={};
+    snap.docs.forEach(d=>{catalogoTarjetasDB[d.id]=d.data();});
   },err=>console.error(err));
 }
 
@@ -1643,7 +1662,7 @@ function leerCSVTag(file){
           const fecha=parseFechaTag(idx.fecha>=0?cols[idx.fecha]:'');
           const importe=Math.abs(parseFloat((cols[idx.importe]||'0').replace(',','.'))||0);
           const caseta=idx.caseta>=0?cols[idx.caseta]:'';
-          const cat=CATALOGO_TAG[tagNum]||{nombre:'Sin asignar',area:'Sin clasificar'};
+          const cat=catalogoTagDB[tagNum]||CATALOGO_TAG[tagNum]||{nombre:'Sin asignar',area:'Sin clasificar'};
           if(importe>0)registros.push({tag:tagNum,fecha,importe,caseta,nombre:cat.nombre,area:cat.area});
         }
         resolve(registros);
@@ -1653,6 +1672,57 @@ function leerCSVTag(file){
     r.readAsText(file,'latin1');
   });
 }
+async function asignarTag(tagNum){
+  const nombre=prompt(`Nombre para el TAG ${tagNum}:`);
+  if(!nombre||!nombre.trim())return;
+  const area=prompt(`Área para "${nombre.trim()}" — escribe exactamente:\nOperación  o  Ventas`,'Operación');
+  if(area===null)return;
+  const areaLimpia=area.trim();
+  if(areaLimpia!=='Operación'&&areaLimpia!=='Ventas'){toast('Área inválida. Debe ser "Operación" o "Ventas".');return;}
+  try{
+    await db.collection('catalogo_tag').doc(tagNum).set({
+      nombre:nombre.trim(),area:areaLimpia,
+      actualizadoPor:sesion.user,actualizadoEn:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    const snap=await db.collection('tag').where('tag','==',tagNum).get();
+    if(snap.size){
+      const batch=db.batch();
+      snap.docs.forEach(d=>batch.update(d.ref,{nombre:nombre.trim(),area:areaLimpia}));
+      await batch.commit();
+    }
+    tagRegistros=tagRegistros.map(r=>r.tag===tagNum?{...r,nombre:nombre.trim(),area:areaLimpia}:r);
+    mostrarResumenTag();
+    toast(`✓ TAG ${tagNum} asignado a ${nombre.trim()}.${snap.size?` Se corrigieron ${snap.size} registro(s) ya guardados.`:''} Las próximas cargas ya lo reconocen.`);
+  }catch(e){toast('Error al asignar: '+e.message);}
+}
+
+async function asignarTarjeta(cuenta){
+  const sucursal=prompt(`Sucursal para la tarjeta ${cuenta} — escribe exactamente:\nCDMX, Morelos, Puebla o General`);
+  if(sucursal===null)return;
+  const sucLimpia=sucursal.trim();
+  if(!['CDMX','Morelos','Puebla','General'].includes(sucLimpia)){toast('Sucursal inválida.');return;}
+  const tipo=prompt(`Tipo para la tarjeta ${cuenta} — escribe:\nOPERACIÓN o VENTAS`,'OPERACIÓN');
+  if(tipo===null)return;
+  const tipoLimpio=tipo.trim().toUpperCase();
+  if(tipoLimpio!=='OPERACIÓN'&&tipoLimpio!=='VENTAS'){toast('Tipo inválido. Debe ser OPERACIÓN o VENTAS.');return;}
+  try{
+    await db.collection('catalogo_tarjetas').doc(cuenta).set({
+      sucursal:sucLimpia,tipo:tipoLimpio,
+      actualizadoPor:sesion.user,actualizadoEn:firebase.firestore.FieldValue.serverTimestamp()
+    });
+    const snap=await db.collection('efectivale').where('cuenta','==',cuenta).get();
+    if(snap.size){
+      const batch=db.batch();
+      snap.docs.forEach(d=>batch.update(d.ref,{sucursal:sucLimpia,tipoGasto:tipoLimpio}));
+      await batch.commit();
+    }
+    efectRegistros=efectRegistros.map(r=>r.cuenta===cuenta?{...r,sucursal:sucLimpia,tipoGasto:tipoLimpio}:r);
+    mostrarResumenEfectivale();
+    toast(`✓ Tarjeta ${cuenta} asignada a ${sucLimpia}.${snap.size?` Se corrigieron ${snap.size} registro(s) ya guardados.`:''} Las próximas cargas ya la reconocen.`);
+  }catch(e){toast('Error al asignar: '+e.message);}
+}
+
+
 function mostrarResumenTag(){
   if(!tagRegistros.length){$('tagPreview').style.display='none';$('tagProcesarBtn').style.display='none';return;}
   const porArea={};
@@ -1660,12 +1730,21 @@ function mostrarResumenTag(){
     if(!porArea[r.area])porArea[r.area]={importe:0,count:0};
     porArea[r.area].importe+=r.importe;porArea[r.area].count++;
   });
-  const sinAsignar=tagRegistros.filter(r=>r.area==='Sin clasificar').length;
   let html=Object.entries(porArea).sort((a,b)=>b[1].importe-a[1].importe).map(([area,v])=>
     `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line);">
       <span><strong>${area}</strong></span><span>${fmt(v.importe)} · ${v.count} peajes</span>
     </div>`).join('');
-  if(sinAsignar>0)html+=`<div style="color:var(--warn);margin-top:6px;font-size:10px;">⚠ ${sinAsignar} TAG(s) sin clasificar</div>`;
+  // Listar cada número de TAG sin clasificar por separado, con botón para asignarlo de una vez
+  const sinClasificar=[...new Set(tagRegistros.filter(r=>r.area==='Sin clasificar').map(r=>r.tag))];
+  if(sinClasificar.length){
+    html+=`<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--line);">
+      <div style="color:var(--warn);font-size:10px;font-weight:700;margin-bottom:6px;">⚠ ${sinClasificar.length} TAG(s) sin clasificar — asígnalos para que no vuelvan a salir así:</div>
+      ${sinClasificar.map(tg=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;">
+        <span style="font-family:monospace;font-size:11px;">${tg}</span>
+        <button class="btn-sec" style="font-size:10px;padding:4px 10px;" onclick="asignarTag('${tg}')">Asignar</button>
+      </div>`).join('')}
+    </div>`;
+  }
   const fechas=tagRegistros.map(r=>r.fecha).filter(Boolean).sort();
   const rango=fechas.length?`${fechas[0]} al ${fechas[fechas.length-1]}`:'';
   html+=`<div style="margin-top:8px;font-weight:800;font-size:12px;">Total: ${fmt(tagRegistros.reduce((a,r)=>a+r.importe,0))} · ${tagRegistros.length} peajes · ${rango}</div>`;
