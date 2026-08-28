@@ -581,7 +581,7 @@ tr:hover td{background:#faf8f3;}
             <option>Viáticos/Foráneas</option><option>Custodia/Seguridad</option><option>Oficina/Papelería/Bodega</option>
             <option>Servicios (luz/agua/internet)</option><option>Local: limpieza/mantto</option>
             <option>Préstamo/Faltante a personal</option><option>Dirección/Socios</option>
-            <option>Salud/Farmacia</option><option>Otros/Revisar</option>
+            <option>Salud/Farmacia</option><option>Policía</option><option>Otros/Revisar</option>
           </select>
           <select id="fSuc" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Todas las sucursales</option><option>CDMX</option><option>Morelos</option><option>Puebla</option></select>
           <select id="fCap" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Todos</option></select>
@@ -1206,16 +1206,43 @@ function guardarCap(n){if(!n)return;let l=JSON.parse(localStorage.getItem('fg_ca
 guardarCap(null);
 
 /* FIREBASE */
-let movimientos=[];
+let movimientos=[],efectivaleTodos=[],tagTodos=[];
 function suscribir(){
   db.collection('movimientos').orderBy('creadoEn','desc').onSnapshot(snap=>{
     movimientos=snap.docs.map(d=>({id:d.id,...d.data()}));
     renderCaja();renderMis();
     if(document.querySelector('.nav-btn[data-view="consolidado"]').classList.contains('active'))renderCons();
   },err=>console.error(err));
+  db.collection('efectivale').orderBy('creadoEn','desc').onSnapshot(snap=>{
+    efectivaleTodos=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderMis();
+    if(document.querySelector('.nav-btn[data-view="consolidado"]').classList.contains('active'))renderCons();
+  },err=>console.error(err));
+  db.collection('tag').orderBy('creadoEn','desc').onSnapshot(snap=>{
+    tagTodos=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderMis();
+    if(document.querySelector('.nav-btn[data-view="consolidado"]').classList.contains('active'))renderCons();
+  },err=>console.error(err));
 }
 
-/* SUBMIT */
+/* Convierte Efectivale y TAG al mismo formato de fila que movimientos, para poder mezclarlos en Mis Gastos y Consolidado */
+function filasEfectivaleTag(){
+  const ef=efectivaleTodos.map(r=>({
+    id:r.id,fecha:(r.fecha||'').substring(0,10),tipo:'Vehículos: gasolina',
+    sucursal:r.sucursal||'',persona:r.chofer||'—',
+    concepto:`Efectivale · ${r.producto||''} · ${r.concepto||''}`.replace(/·\s*·/g,'·'),
+    monto:r.cargo||0,comprobante:true,capturista:r.capturista||'',_soloLectura:true
+  }));
+  const tg=tagTodos.map(r=>({
+    id:r.id,fecha:(r.fecha||'').substring(0,10),tipo:'TAG',
+    sucursal:r.area==='Ventas'?'Ventas':'Operación',persona:r.nombre||'—',
+    concepto:`TAG ${r.tag||''} · ${r.caseta||''}`,
+    monto:r.importe||0,comprobante:true,capturista:r.capturista||'',_soloLectura:true
+  }));
+  return[...ef,...tg];
+}
+
+
 $('submitBtn').addEventListener('click',async()=>{
   if(!sesion)return;
   const persona=$('persona').value.trim();
@@ -1426,23 +1453,28 @@ function renderMis(){
     const buscaOk=!busca||m.concepto.toLowerCase().includes(busca)||(m.tipo||'').toLowerCase().includes(busca);
     return esMio&&fechaOk&&buscaOk&&!m.esFijo&&!m.esEfectivale&&!m.esTag;
   });
+  // agregar Efectivale y TAG que subió esta persona (antes no se veían nunca)
+  const extra=filasEfectivaleTag().filter(m=>{
+    const esMio=sesion.rol==='admin'||m.capturista===sesion.user;
+    const fechaOk=!f||m.fecha===f;
+    const buscaOk=!busca||m.concepto.toLowerCase().includes(busca)||(m.tipo||'').toLowerCase().includes(busca);
+    return esMio&&fechaOk&&buscaOk;
+  });
+  datos=[...datos,...extra];
   // orden alfabético por concepto
   datos=[...datos].sort((a,b)=>(a.concepto||'').toLowerCase().localeCompare((b.concepto||'').toLowerCase(),'es'));
   const total=datos.reduce((a,m)=>a+m.monto,0);
   $('misTotal').textContent=fmt(total);
   const tb=$('misTbody');
   if(!datos.length){tb.innerHTML=`<tr class="erow"><td colspan="7">Sin movimientos.</td></tr>`;return;}
-  tb.innerHTML=datos.map(m=>`<tr>
+  tb.innerHTML=datos.map(m=>`<tr${m._soloLectura?' style="background:#faf7fd;"':''}>
     <td>${m.fecha}</td>
     <td><span class="${bdg(m.tipo)}">${m.tipo}</span></td>
     <td>${m.persona||'—'}</td>
-    <td>${m.concepto}${!m.comprobante&&!m.causaRaiz?'<span title="Sin comprobante" style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td>
+    <td>${m.concepto}${!m.comprobante&&!m.causaRaiz&&!m._soloLectura?'<span title="Sin comprobante" style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td>
     <td class="ac">${fmt(m.monto)}</td>
     <td>${m.comprobante?'📎':'—'}</td>
-    <td>
-      <button class="ibtn" onclick="abrirEdSoloMonto('${m.id}')" title="Editar monto">✎</button>
-      <button class="ibtn" onclick="eliminar('${m.id}')" title="Eliminar">✕</button>
-    </td>
+    <td>${m._soloLectura?'':`<button class="ibtn" onclick="abrirEdSoloMonto('${m.id}')" title="Editar monto">✎</button><button class="ibtn" onclick="eliminar('${m.id}')" title="Eliminar">✕</button>`}</td>
   </tr>`).join('');
 }
 $('misFecha').addEventListener('change',renderMis);
@@ -1454,6 +1486,7 @@ $('misClear').addEventListener('click',()=>{$('misFecha').value='';renderMis();}
 function renderCons(){
   const t=$('fTipo').value,s=$('fSuc').value,c=$('fCap').value,f=$('fFecha').value;
   const base=movimientos.filter(m=>(!t||m.tipo===t)&&(!s||m.sucursal===s)&&(!c||m.capturista===c)&&(!f||m.fecha===f));
+  const extra=filasEfectivaleTag().filter(m=>(!t||m.tipo===t)&&(!s||m.sucursal===s)&&(!c||m.capturista===c)&&(!f||m.fecha===f));
   const bonifs=base.filter(m=>m.tipo==='Bonificación a cliente');
   const gastos=base.filter(m=>m.tipo!=='Bonificación a cliente');
   $('mBonif').textContent=fmt(bonifs.reduce((a,m)=>a+m.monto,0));
@@ -1468,8 +1501,9 @@ function renderCons(){
   const cs=$('fCap');const pv=cs.value;cs.innerHTML='<option value="">Todos</option>'+caps.map(c=>`<option${c===pv?' selected':''}>${c}</option>`).join('');
   // detalle
   const tb=$('consTbody');
-  if(!base.length){tb.innerHTML=`<tr class="erow"><td colspan="10">Sin movimientos en este filtro.</td></tr>`;return;}
-  tb.innerHTML=[...base].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(m=>`<tr><td>${m.fecha}</td><td><span class="${bdg(m.tipo)}">${m.tipo}</span></td><td>${m.sucursal}</td><td>${m.persona||'—'}</td><td>${m.concepto}${!m.comprobante&&!m.causaRaiz?'<span style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td><td class="ac">${fmt(m.monto)}</td><td>${m.autorizado||'—'}</td><td>${m.comprobante?'📎':'—'}</td><td>${m.capturista}</td><td>${sesion.rol==='admin'?`<button class="ibtn" onclick="abrirEd('${m.id}')">✎</button><button class="ibtn" onclick="eliminar('${m.id}')">✕</button>`:''}</td></tr>`).join('');
+  const todos=[...base,...extra];
+  if(!todos.length){tb.innerHTML=`<tr class="erow"><td colspan="10">Sin movimientos en este filtro.</td></tr>`;return;}
+  tb.innerHTML=[...todos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')).map(m=>`<tr${m._soloLectura?' style="background:#faf7fd;"':''}><td>${m.fecha}</td><td><span class="${bdg(m.tipo)}">${m.tipo}</span></td><td>${m.sucursal}</td><td>${m.persona||'—'}</td><td>${m.concepto}${!m.comprobante&&!m.causaRaiz&&!m._soloLectura?'<span style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td><td class="ac">${fmt(m.monto)}</td><td>${m.autorizado||'—'}</td><td>${m.comprobante?'📎':'—'}</td><td>${m.capturista}</td><td>${sesion.rol==='admin'&&!m._soloLectura?`<button class="ibtn" onclick="abrirEd('${m.id}')">✎</button><button class="ibtn" onclick="eliminar('${m.id}')">✕</button>`:''}</td></tr>`).join('');
 }
 ['fTipo','fSuc','fCap','fFecha'].forEach(id=>$(id).addEventListener('change',renderCons));
 $('clearF').addEventListener('click',()=>{['fTipo','fSuc','fCap','fFecha'].forEach(id=>$(id).value='');renderCons();});

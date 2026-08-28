@@ -790,10 +790,11 @@ function renderDetalle(base){
   // agregar fijos al detalle
   let fijosRows=[];
   if(!t||t==='Gastos fijos'){
-    fijosRows=f.filter(m=>m.esFijo&&(m.monto||0)>0).filter(m=>{
-      const fe=(m.fecha||'').substring(0,10);
-      return(!s||m.sucursal===s)&&(!fecha||fe===fecha);
-    }).map(m=>({...m,_esFijo:true}));
+    const dDesde=$('fDesde').value,dHasta=$('fHasta').value;
+    fijosRows=fijosPagosV4.filter(p=>{
+      const fe=(p.fecha||'').substring(0,10);
+      return(!s||p.sucursal===s)&&(!fecha||fe===fecha)&&(!dDesde||fe>=dDesde)&&(!dHasta||fe<=dHasta);
+    }).map(p=>({...p,tipo:p.tipo||'Gastos fijos',_esFijo:true}));
   }
   // agregar TAG al detalle
   let tagRows=[];
