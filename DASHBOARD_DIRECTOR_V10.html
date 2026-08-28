@@ -387,7 +387,7 @@ tr:hover td{background:#faf8f3;}
           <option>Viáticos/Foráneas</option><option>Custodia/Seguridad</option><option>Oficina/Papelería/Bodega</option>
           <option>Servicios (luz/agua/internet)</option><option>Local: limpieza/mantto</option>
           <option>Préstamo/Faltante a personal</option><option>Dirección/Socios</option>
-          <option>Salud/Farmacia</option><option>Policía</option><option>Otros/Revisar</option>
+          <option>Salud/Farmacia</option><option>Policía</option><option>Otros/Revisar</option><option>Gastos fijos</option>
         </select>
         <select id="dSuc" style="width:auto;font-size:12px;padding:7px 10px;"><option value="">Todas las sucursales</option><option>CDMX</option><option>Morelos</option><option>Puebla</option></select>
         <input type="date" id="dFechaDesde" title="Desde" style="width:auto;font-size:12px;padding:7px 10px;">
@@ -790,13 +790,12 @@ function renderDetalle(base){
   }
   // agregar fijos al detalle
   let fijosRows=[];
-  {
+  if(!t||t==='Gastos fijos'){
     const dDesde=$('fDesde').value,dHasta=$('fHasta').value;
     fijosRows=fijosPagosV4.filter(p=>{
       const fe=(p.fecha||'').substring(0,10);
-      const tipoReal=p.tipo||'Gastos fijos';
-      return(!t||tipoReal===t)&&(!s||p.sucursal===s)&&(!fD||fe>=fD)&&(!fH||fe<=fH)&&(!dDesde||fe>=dDesde)&&(!dHasta||fe<=dHasta);
-    }).map(p=>({...p,tipo:p.tipo||'Gastos fijos',_esFijo:true}));
+      return(!s||p.sucursal===s)&&(!fD||fe>=fD)&&(!fH||fe<=fH)&&(!dDesde||fe>=dDesde)&&(!dHasta||fe<=dHasta);
+    }).map(p=>({...p,tipo:'Gastos fijos',_esFijo:true}));
   }
   // agregar TAG al detalle
   let tagRows=[];
