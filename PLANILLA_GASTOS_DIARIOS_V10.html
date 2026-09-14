@@ -1250,13 +1250,16 @@ function filasEfectivaleTag(){
     id:r.id,fecha:(r.fecha||'').substring(0,10),tipo:'Vehículos: gasolina',
     sucursal:r.sucursal||'',persona:r.chofer||'—',
     concepto:`Efectivale · ${r.producto||''} · ${r.concepto||''}`.replace(/·\s*·/g,'·'),
-    monto:r.cargo||0,comprobante:true,capturista:r.capturista||'',_soloLectura:true
+    monto:r.cargo||0,comprobante:true,capturista:r.capturista||'',_soloLectura:true,
+    _cuentaNum:r.cuenta,_sinClasificar:r.sucursal==='Sin asignar'
   }));
   const tg=tagTodos.map(r=>({
     id:r.id,fecha:(r.fecha||'').substring(0,10),tipo:'TAG',
-    sucursal:r.area==='Ventas'?'Ventas':'Operación',persona:r.nombre||'—',
+    sucursal:r.area==='Sin clasificar'?'Sin asignar':(r.area==='Ventas'?'Ventas':'Operación'),
+    persona:r.nombre||'—',
     concepto:`TAG ${r.tag||''} · ${r.caseta||''}`,
-    monto:r.importe||0,comprobante:true,capturista:r.capturista||'',_soloLectura:true
+    monto:r.importe||0,comprobante:true,capturista:r.capturista||'',_soloLectura:true,
+    _tagNum:r.tag,_sinClasificar:r.area==='Sin clasificar'
   }));
   return[...ef,...tg];
 }
@@ -1486,14 +1489,14 @@ function renderMis(){
   $('misTotal').textContent=fmt(total);
   const tb=$('misTbody');
   if(!datos.length){tb.innerHTML=`<tr class="erow"><td colspan="7">Sin movimientos.</td></tr>`;return;}
-  tb.innerHTML=datos.map(m=>`<tr${m._soloLectura?' style="background:#faf7fd;"':''}>
+  tb.innerHTML=datos.map(m=>`<tr${m._sinClasificar?' style="background:#fff3d6;"':(m._soloLectura?' style="background:#faf7fd;"':'')}>
     <td>${m.fecha}</td>
     <td><span class="${bdg(m.tipo)}">${m.tipo}</span></td>
-    <td>${m.persona||'—'}</td>
+    <td>${m.persona||'—'}${m._sinClasificar?' <span title="Sin nombre/zona asignada" style="color:var(--warn);">⚠</span>':''}</td>
     <td>${m.concepto}${!m.comprobante&&!m.causaRaiz&&!m._soloLectura?'<span title="Sin comprobante" style="color:var(--danger);margin-left:3px;">⚠</span>':''}${m.causaRaiz?`<br><small style="color:var(--warn);font-size:10px;">⚠ ${m.causaRaiz}</small>`:''}</td>
     <td class="ac">${fmt(m.monto)}</td>
     <td>${m.comprobante?'📎':'—'}</td>
-    <td>${m._soloLectura?'':`<button class="ibtn" onclick="abrirEdSoloMonto('${m.id}')" title="Editar monto">✎</button><button class="ibtn" onclick="eliminar('${m.id}')" title="Eliminar">✕</button>`}</td>
+    <td>${m._sinClasificar?`<button class="btn-sec" style="font-size:10px;padding:4px 8px;" onclick="${m.tipo==='TAG'?`asignarTag('${m._tagNum}')`:`asignarTarjeta('${m._cuentaNum}')`}">Asignar</button>`:(m._soloLectura?'':`<button class="ibtn" onclick="abrirEdSoloMonto('${m.id}')" title="Editar monto">✎</button><button class="ibtn" onclick="eliminar('${m.id}')" title="Eliminar">✕</button>`)}</td>
   </tr>`).join('');
 }
 $('misFecha').addEventListener('change',renderMis);
