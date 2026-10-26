@@ -610,7 +610,7 @@ tr:hover td{background:#faf8f3;}
       <option>Viáticos/Foráneas</option><option>Custodia/Seguridad</option><option>Oficina/Papelería/Bodega</option>
       <option>Servicios (luz/agua/internet)</option><option>Local: limpieza/mantto</option>
       <option>Préstamo/Faltante a personal</option><option>Dirección/Socios</option>
-      <option>Salud/Farmacia</option><option>Otros/Revisar</option>
+      <option>Salud/Farmacia</option><option>Policía</option><option>Otros/Revisar</option>
     </select></div>
     <div class="fg" style="display:none;"><label>Sucursal</label><select id="edSuc"><option>CDMX</option><option>Morelos</option><option>Puebla</option></select></div>
     <div class="fg" style="display:none;"><label>Persona</label><input type="text" id="edPersona"></div>
@@ -755,8 +755,9 @@ function iniciarSesion(){
   suscribir();
 }
 $('logoutBtn').addEventListener('click',()=>{sessionStorage.removeItem('fg_sesion');location.reload();});
+// Se restaura al terminar de cargar TODO el script (antes usaba variables que aún no existían y la Planilla se rompía al recargar la página)
 const sesGuardada=sessionStorage.getItem('fg_sesion');
-if(sesGuardada){sesion=JSON.parse(sesGuardada);iniciarSesion();}
+if(sesGuardada){setTimeout(()=>{sesion=JSON.parse(sesGuardada);iniciarSesion();},0);}
 
 /* TABS */
 document.querySelectorAll('.nav-btn').forEach(b=>b.addEventListener('click',()=>{
@@ -1267,6 +1268,12 @@ function filasEfectivaleTag(){
 
 $('submitBtn').addEventListener('click',async()=>{
   if(!sesion)return;
+  if(!tipoSel||!String(tipoSel).trim()){
+    const m0=$('statusMsg');
+    m0.textContent='Selecciona la categoría del gasto (Tipo de gasto) antes de registrar.';m0.className='status-msg err';
+    const b0=document.querySelector('.tipo-btn');if(b0)b0.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   const persona=$('persona').value.trim();
   const monto=parseFloat($('monto').value);
   const cap=sesion.user;
@@ -1547,12 +1554,28 @@ async function eliminar(id){if(!confirm('¿Eliminar este movimiento?'))return;tr
 /* EDICIÓN */
 let idEd=null;
 
+function prepararEdTipo(m){
+  const sel=$('edTipo');
+  const tipo=String(m.tipo||'').trim();
+  if(!sel.querySelector('option[value=""]')){
+    const ph=document.createElement('option');ph.value='';ph.textContent='— Selecciona la categoría —';
+    sel.insertBefore(ph,sel.firstChild);
+  }
+  if(tipo&&![...sel.options].some(o=>o.value===tipo)){
+    const o=document.createElement('option');o.textContent=tipo;sel.appendChild(o); // tipo poco común: se conserva tal cual
+  }
+  sel.value=tipo;
+  if(sel.selectedIndex<0)sel.selectedIndex=0;
+  const wrap=sel.closest('.fg');
+  if(wrap)wrap.style.display=tipo?'none':''; // solo se muestra cuando falta la categoría
+}
+
 function abrirEdSoloMonto(id){
   const m=movimientos.find(x=>x.id===id);
   if(!m)return;
   idEd=id;compEd=m.comprobante||null;
   // llenar todos los campos ocultos para que guardarEd funcione
-  $('edTipo').value=m.tipo;
+  prepararEdTipo(m);
   $('edSuc').value=m.sucursal;
   $('edPersona').value=m.persona||'';
   $('edMonto').value=m.monto;
@@ -1568,7 +1591,7 @@ function abrirEdSoloMonto(id){
   $('modalEd').classList.add('show');
 }
 
-function abrirEd(id){const m=movimientos.find(x=>x.id===id);if(!m)return;idEd=id;compEd=m.comprobante||null;$('edTipo').value=m.tipo;$('edSuc').value=m.sucursal;$('edPersona').value=m.persona||'';$('edMonto').value=m.monto;$('edConcepto').value=m.concepto;$('edCausa').value=m.causaRaiz||'';$('edAutorizado').value=m.autorizado||'';$('edFecha').value=m.fecha;$('edCapturista').value=m.capturista;renderEdComp();$('modalEd').classList.add('show');}
+function abrirEd(id){const m=movimientos.find(x=>x.id===id);if(!m)return;idEd=id;compEd=m.comprobante||null;prepararEdTipo(m);$('edSuc').value=m.sucursal;$('edPersona').value=m.persona||'';$('edMonto').value=m.monto;$('edConcepto').value=m.concepto;$('edCausa').value=m.causaRaiz||'';$('edAutorizado').value=m.autorizado||'';$('edFecha').value=m.fecha;$('edCapturista').value=m.capturista;renderEdComp();$('modalEd').classList.add('show');}
 function renderEdComp(){const c=$('edCompAct');if(!compEd){c.innerHTML='<span style="font-size:11px;color:var(--muted);">Sin comprobante</span>';return;}c.innerHTML=compEd.tipo==='imagen'?`<img src="${compEd.data}" style="max-height:80px;border-radius:7px;border:1px solid var(--line);">`:`<span style="font-size:12px;color:var(--ok);font-weight:700;">📄 ${compEd.nombre||'PDF'}</span>`;}
 $('cerrarEd').addEventListener('click',()=>{idEd=null;compEd=null;$('modalEd').classList.remove('show');});
 $('modalEd').addEventListener('click',e=>{if(e.target.id==='modalEd'){idEd=null;compEd=null;$('modalEd').classList.remove('show');}});
@@ -1585,9 +1608,14 @@ $('guardarEd').addEventListener('click',async()=>{
   if(!concepto){toast('El concepto es obligatorio',false);return;}
   if(!cap){toast('El campo quién captura es obligatorio',false);return;}
   if(!fecha){toast('La fecha es obligatoria',false);return;}
+  const tipoEd=($('edTipo').value||'').trim();
+  if(!tipoEd){
+    const w=$('edTipo').closest('.fg');if(w)w.style.display='';
+    toast('Selecciona la categoría del movimiento',false);return;
+  }
   try{
     await db.collection('movimientos').doc(idEd).update({
-      tipo:$('edTipo').value,sucursal:$('edSuc').value,
+      tipo:tipoEd,sucursal:$('edSuc').value,
       persona:$('edPersona').value.trim(),monto,concepto,fecha,
       capturista:cap,causaRaiz:$('edCausa').value.trim(),
       autorizado:$('edAutorizado').value.trim(),comprobante:compEd

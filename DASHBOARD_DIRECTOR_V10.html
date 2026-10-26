@@ -60,7 +60,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .filters select,.filters input{width:auto;padding:8px 11px;font-size:12.5px;}
 
 /* HERO */
-.hero-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-bottom:16px;}
+.hero-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-bottom:16px;}
 @media(max-width:800px){.hero-grid{grid-template-columns:repeat(2,1fr);}}
 .hero{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;box-shadow:var(--shadow);transition:transform .2s,box-shadow .2s;animation:up .35s ease;}
 .hero:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);}
@@ -71,6 +71,7 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);
 .hero.b .val{color:var(--danger);}
 .hero.w .val{color:var(--warn);}
 .hero.a .val{color:var(--danger);}
+.hero.d .val{color:#a07c10;}
 
 /* CATS */
 .cat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:16px;}
@@ -248,7 +249,7 @@ tr:hover td{background:#faf8f3;}
   </div>
 
   <!-- BARRA DE TOTALES CONSOLIDADOS -->
-  <div style="background:linear-gradient(135deg,#141c18,#1e3028);border-radius:12px;margin-bottom:14px;display:grid;grid-template-columns:repeat(5,1fr);overflow:hidden;border:1px solid #2e5040;">
+  <div style="background:linear-gradient(135deg,#141c18,#1e3028);border-radius:12px;margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));overflow:hidden;border:1px solid #2e5040;">
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Gasto operativo</div>
       <div style="font-size:22px;font-weight:800;color:#fff;" id="totalOpBarra">$0</div>
@@ -258,6 +259,11 @@ tr:hover td{background:#faf8f3;}
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Bonificaciones <span style="font-size:9px;background:rgba(255,255,255,.1);padding:1px 6px;border-radius:8px;font-weight:400;">no es gasto</span></div>
       <div style="font-size:22px;font-weight:800;color:#f0a0a0;" id="totalBonifBarra">$0</div>
       <div style="font-size:11px;color:#9eb8a8;margin-top:3px;" id="totalBonifMovBarra">0 registros</div>
+    </div>
+    <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);background:rgba(200,160,32,.14);">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#e8c860;margin-bottom:5px;">Dirección/Socios <span style="font-size:9px;background:rgba(200,160,32,.3);padding:1px 6px;border-radius:8px;font-weight:400;">aparte del operativo</span></div>
+      <div style="font-size:22px;font-weight:800;color:#e8c860;" id="totalDirBarra">$0</div>
+      <div style="font-size:11px;color:#e8c860;margin-top:3px;" id="totalDirDetBarra">Sin movimientos</div>
     </div>
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);background:rgba(46,125,69,.15);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#80d0a0;margin-bottom:5px;">Efectivale <span style="font-size:9px;background:rgba(46,125,69,.3);padding:1px 6px;border-radius:8px;font-weight:400;">gasolina</span></div>
@@ -277,7 +283,7 @@ tr:hover td{background:#faf8f3;}
     <div style="padding:14px 18px;background:rgba(181,72,42,.2);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#f0b8a0;margin-bottom:5px;">Total egresos</div>
       <div style="font-size:26px;font-weight:900;color:#fff;" id="totalEgresosBarra">$0</div>
-      <div style="font-size:11px;color:#f0b8a0;margin-top:3px;">op + bonif + efect + fijos</div>
+      <div style="font-size:11px;color:#f0b8a0;margin-top:3px;">op + dirección + bonif + efect + TAG + fijos</div>
     </div>
   </div>
 
@@ -319,6 +325,7 @@ tr:hover td{background:#faf8f3;}
   <!-- HERO -->
   <div class="hero-grid">
     <div class="hero t"><div class="lbl">Gasto diario en periodo</div><div class="val" id="hGasto">$0</div><div class="sub" id="hGastoSub">0 movimientos</div></div>
+    <div class="hero d"><div class="lbl">Dirección/Socios (aparte)</div><div class="val" id="hDir">$0</div><div class="sub" id="hDirSub">0 movimientos</div></div>
     <div class="hero b"><div class="lbl">Bonificaciones (no gasto)</div><div class="val" id="hBonif">$0</div><div class="sub" id="hBonifSub">0 registros</div></div>
     <div class="hero w"><div class="lbl">Fijos pendientes del mes</div><div class="val" id="hPend">$0</div><div class="sub" id="hPendSub">Mes actual</div></div>
     <div class="hero a"><div class="lbl">Sin comprobante ni causa</div><div class="val" id="hSinComp">0</div><div class="sub">Requieren atención</div></div>
@@ -603,40 +610,88 @@ function renderAreas(gastos){
     </div>`).join('');
 }
 
-/* ─── HELPER GASTOS FIJOS CON ABONO ─── */
-function getEstadoFijo(id){
-  const hoyD=new Date();
-  const claveMes=`${hoyD.getFullYear()}-${String(hoyD.getMonth()+1).padStart(2,'0')}`;
-  const raw=estadosFijos[`${claveMes}_${id}`];
-  if(!raw)return{estado:'pendiente',pagado:0};
-  if(typeof raw==='string')return{estado:raw,pagado:raw==='pagado'?null:0};
-  return{estado:raw.estado||'pendiente',pagado:raw.pagado||0};
+/* ─── GASTO OPERATIVO vs DIRECCIÓN/SOCIOS ───
+   Dirección/Socios (pago TC, retiro de socios, etc.) NO es gasto operativo de la sucursal:
+   se muestra en su propia tarjeta, igual que las bonificaciones, pero sí cuenta en el total de egresos.
+   gastosBase = todo lo capturado en Planilla (sin bonificaciones/Efectivale/fijos); sirve para las alertas de control.
+   gastos     = gastosBase sin Dirección/Socios (gasto operativo). dirs = solo Dirección/Socios. */
+const TIPO_DIRECCION='Dirección/Socios';
+function separarGastos(f){
+  const gastosBase=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale&&!m.esFijo&&!m.esTag);
+  return{gastosBase,gastos:gastosBase.filter(m=>m.tipo!==TIPO_DIRECCION),dirs:gastosBase.filter(m=>m.tipo===TIPO_DIRECCION)};
 }
-function getSaldoFijo(c){
-  const e=getEstadoFijo(c.id);
-  if(e.estado==='pagado')return 0;
-  if(e.estado==='parcial')return c.monto-(e.pagado||0);
-  return c.monto;
+function sumaMonto(arr){return arr.reduce((a,m)=>a+(Number(m.monto)||0),0);}
+function detalleSucursales(arr){
+  return['CDMX','Morelos','Puebla'].map(s=>{const v=sumaMonto(arr.filter(m=>m.sucursal===s));return v>0?`${s} ${fmt(v)}`:null;}).filter(Boolean).join(' · ');
 }
-function getPagadoFijo(c){
-  const e=getEstadoFijo(c.id);
-  if(e.estado==='pagado')return c.monto;
-  if(e.estado==='parcial')return e.pagado||0;
-  return 0;
+
+/* ─── GASTOS FIJOS: UNA SOLA FUENTE ───
+   Un pago capturado en Gastos Fijos (colección fijos_pagos) marca como PAGADO al concepto del catálogo
+   que le corresponde (se empata por nombre; los conceptos con zona se guardan como "Agua CDMX").
+   La tarjeta, la tabla de estado de pago, el agente y los reportes salen todos de fijosMes(). */
+function normFijo(s){return String(s==null?'':s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+function mesFijosStr(){
+  const d=$('fDesde')?$('fDesde').value:'';
+  return d?d.substring(0,7):`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
+}
+let _fijosMemo=null;
+function fijosMes(){
+  const mesStr=mesFijosStr();
+  const m=_fijosMemo;
+  if(m&&m.p===fijosPagosV4&&m.c===catalogoFijos&&m.e===estadosFijos&&m.m===mesStr)return m.r;
+  const pagosMes=fijosPagosV4.filter(p=>(p.mes||p.fecha||'').substring(0,7)===mesStr);
+  const usados=new Set();
+  const activos=catalogoFijos.filter(c=>c.activo!==false);
+  const rows=activos.map(c=>{
+    const keys=new Set([normFijo(c.concepto)]);
+    if(c.sucursal)keys.add(normFijo(c.concepto+' '+c.sucursal));
+    const ps=pagosMes.filter(p=>keys.has(normFijo(p.concepto))||keys.has(normFijo((p.tipo||'')+' '+(p.sucursal||''))));
+    ps.forEach(p=>usados.add(p.id));
+    const monto=Number(c.monto)||0;
+    let pagado=ps.reduce((a,p)=>a+(Number(p.monto)||0),0);
+    let estado=ps.length?'pagado':'pendiente';
+    if(!ps.length){
+      // respaldo: marca manual anterior (fijos_estados) cuando todavía no hay pago capturado
+      const raw=estadosFijos[`${mesStr}_${c.id}`];
+      const est=raw?(typeof raw==='string'?raw:raw.estado):'';
+      if(est==='pagado'){estado='pagado';pagado=monto;}
+      else if(est==='parcial'){estado='parcial';pagado=(raw&&raw.pagado)||0;}
+    }
+    const saldo=estado==='pagado'?0:Math.max(0,monto-pagado);
+    return{c,monto,pagado,estado,saldo,nPagos:ps.length};
+  });
+  const pendientes=rows.filter(r=>r.estado!=='pagado');
+  const sinCat=pagosMes.filter(p=>!usados.has(p.id));
+  const r={
+    mesStr,rows,pagosMes,
+    total:sumaMonto(pagosMes),                       // pagos capturados en el mes (lo que ya se pagó)
+    pendientes,pendTotal:pendientes.reduce((a,x)=>a+x.saldo,0),
+    pagadosN:rows.length-pendientes.length,
+    sinCat,sinCatTotal:sumaMonto(sinCat),
+    sinMonto:pendientes.filter(x=>!x.monto).length
+  };
+  _fijosMemo={p:fijosPagosV4,c:catalogoFijos,e:estadosFijos,m:mesStr,r};
+  return r;
+}
+function textoPendFijos(fm){
+  return`${fmt(fm.pendTotal)} pendientes · ${fm.pendientes.length} de ${fm.rows.length} conceptos`;
 }
 
 /* RENDER PRINCIPAL */
 function renderTodo(){
   $('fechaHoy').textContent=new Date().toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale&&!m.esFijo);
+  const {gastosBase,gastos,dirs}=separarGastos(f);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const total=gastos.reduce((a,m)=>a+m.monto,0);
+  const totalDir=sumaMonto(dirs);
   const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
-  const sinComp=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
+  const sinComp=gastosBase.filter(m=>!m.comprobante&&!m.causaRaiz);
 
   $('hGasto').textContent=fmt(total);
-  $('hGastoSub').textContent=`${gastos.length} movimientos`;
+  $('hGastoSub').textContent=`${gastos.length} movimientos · sin Dirección/Socios`;
+  $('hDir').textContent=fmt(totalDir);
+  $('hDirSub').textContent=dirs.length?`${dirs.length} movimiento${dirs.length!==1?'s':''} · ${detalleSucursales(dirs)}`:'0 movimientos';
   $('hBonif').textContent=fmt(totalBonif);
   $('hBonifSub').textContent=`${bonifs.length} registros`;
   $('hSinComp').textContent=sinComp.length;
@@ -644,18 +699,17 @@ function renderTodo(){
   // Fijos V3 (Claudia) + Fijos V4 (Miriam/Nancy/Jennifer) + V10
   const desdeF=$('fDesde').value;
   const mesStr=desdeF?desdeF.substring(0,7):`${new Date().getFullYear()}-${String(new Date().getMonth()+1).padStart(2,'0')}`;
-  const fijosV4Mes=fijosPagosV4.filter(p=>{
-    const pMes=(p.mes||p.fecha||'').substring(0,7);
-    return pMes===mesStr;
-  });
-  const fijosV4Total=fijosV4Mes.reduce((a,p)=>a+(Number(p.monto)||0),0);
-  // Si hay compromisos configurados usarlos, si no mostrar solo lo pagado
-  // catalogoFijos tiene conceptos históricos del V3/V4 — no sumar al total
-  // Solo mostrar fijosV4Total = pagos reales capturados en fijos_pagos
-  const fijosTotal=fijosV4Total;
-  const fijosPend=0;
-  $('hPend').textContent=fmt(fijosPend);
-  $('hPendSub').textContent=`${MESES[mesAct]} ${anioAct}`;
+  // Una sola fuente (fijosMes): pagos capturados = pagado; concepto sin pago capturado = pendiente
+  const fm=fijosMes();
+  const fijosTotal=fm.total;
+  const fijosPend=fm.pendTotal;
+  if(fijosCargados){
+    $('hPend').textContent=fmt(fm.pendTotal);
+    $('hPendSub').textContent=`${fm.pendientes.length} de ${fm.rows.length} conceptos · ${MESES[+fm.mesStr.substring(5,7)-1]||MESES[mesAct]} ${fm.mesStr.substring(0,4)}`;
+  }else{
+    $('hPend').textContent='…';
+    $('hPendSub').textContent='Cargando gastos fijos';
+  }
 
   // ─── BARRA DE TOTALES CONSOLIDADOS ───
   const desde=$('fDesde').value;const hasta=$('fHasta').value;
@@ -675,6 +729,8 @@ function renderTodo(){
   const tagPorArea=['Operación','Ventas'].map(a=>{const v=tagFilt.filter(r=>r.area===a).reduce((a2,r)=>a2+r.importe,0);return v>0?`${a} ${fmt(v)}`:null;}).filter(Boolean);
   $('totalOpBarra').textContent=fmt(total);
   $('totalOpMovBarra').textContent=`${gastos.length} movimiento${gastos.length!==1?'s':''}`;
+  $('totalDirBarra').textContent=fmt(totalDir);
+  $('totalDirDetBarra').textContent=dirs.length?`${dirs.length} mov. · ${detalleSucursales(dirs)}`:'Sin movimientos';
   $('totalBonifBarra').textContent=fmt(totalBonif);
   $('totalBonifMovBarra').textContent=`${bonifs.length} registro${bonifs.length!==1?'s':''}`;
   $('totalEfectBarra').textContent=fmt(totalEfect);
@@ -683,10 +739,10 @@ function renderTodo(){
   $('totalTagDetBarra').textContent=tagPorArea.length?tagPorArea.join(' · '):'Sin peajes';
   if(fijosCargados){
     $('totalFijosBarra').textContent=fmt(fijosTotal);
-    $('totalFijosPendBarra').textContent=`${fmt(fijosPend)} pendientes`;
-    $('totalEgresosBarra').textContent=fmt(total+totalBonif+totalEfect+totalTag+fijosTotal);
+    $('totalFijosPendBarra').textContent=textoPendFijos(fm);
+    $('totalEgresosBarra').textContent=fmt(total+totalDir+totalBonif+totalEfect+totalTag+fijosTotal);
   } else {
-    $('totalEgresosBarra').textContent=fmt(total+totalBonif+totalEfect+totalTag);
+    $('totalEgresosBarra').textContent=fmt(total+totalDir+totalBonif+totalEfect+totalTag);
   }
 
   // categorías
@@ -716,7 +772,7 @@ function renderTodo(){
   if(!sinComp.length)asc.innerHTML='<div class="alert-empty">Sin alertas ✓</div>';
   else asc.innerHTML=sinComp.slice(0,6).map(m=>`<div class="alert-item"><span>${m.fecha} · ${m.sucursal} · ${m.concepto}</span><span>${fmt(m.monto)}</span></div>`).join('')+(sinComp.length>6?`<div style="font-size:10.5px;color:var(--danger);margin-top:3px;">…y ${sinComp.length-6} más</div>`:'');
 
-  const autors=gastos.filter(m=>m.autorizado);
+  const autors=gastosBase.filter(m=>m.autorizado);
   const aau=$('alertaAutor');
   if(!autors.length)aau.innerHTML='<div class="alert-empty">Sin movimientos mayores ✓</div>';
   else aau.innerHTML=autors.slice(0,6).map(m=>`<div class="alert-item"><span>${m.fecha} · ${m.concepto}<br><small>Autorizó: ${m.autorizado}</small></span><span>${fmt(m.monto)}</span></div>`).join('');
@@ -768,9 +824,14 @@ function renderTodo(){
 
   // fijos
   const tbF=$('tbFijos');
-  const catalogoFijosActivos=catalogoFijos.filter(c=>c.activo!==false);
-  if(!catalogoFijosActivos.length){tbF.innerHTML='<tr class="erow"><td colspan="5">Sin gastos fijos configurados.</td></tr>';}
-  else tbF.innerHTML=catalogoFijosActivos.map(c=>{const ef=getEstadoFijo(c.id);const saldo=getSaldoFijo(c);const pagado=getPagadoFijo(c);const label=ef.estado==='pagado'?'Pagado':ef.estado==='parcial'?`Parcial: ${fmt(pagado)} / ${fmt(c.monto)}`:'Pendiente';const cls=ef.estado==='pagado'?'pagado':ef.estado==='parcial'?'parcial':'pendiente';return`<tr><td>${c.concepto}</td><td>${c.sucursal||'Sin asignar'}</td><td>${c.dia?'Día '+c.dia:'—'}</td><td class="ac">${fmt(c.monto)}</td><td><span class="ep ${cls}">${label}</span></td></tr>`;}).join('');
+  if(!fm.rows.length){tbF.innerHTML='<tr class="erow"><td colspan="5">Sin gastos fijos configurados.</td></tr>';}
+  else{
+    tbF.innerHTML=fm.rows.map(r=>{
+      const c=r.c;
+      const label=r.estado==='pagado'?(r.nPagos?`Pagado · ${fmt(r.pagado)}`:'Pagado'):r.estado==='parcial'?`Parcial: ${fmt(r.pagado)} / ${fmt(r.monto)}`:'Pendiente';
+      return`<tr><td>${c.concepto}</td><td>${c.sucursal||'Sin asignar'}</td><td>${c.dia?'Día '+c.dia:'—'}</td><td class="ac">${fmt(r.monto)}</td><td><span class="ep ${r.estado}">${label}</span></td></tr>`;
+    }).join('')+(fm.sinCat.length?`<tr class="erow"><td colspan="5">Además hay ${fm.sinCat.length} pago(s) por ${fmt(fm.sinCatTotal)} capturados en el mes que no corresponden a ningún concepto del catálogo (ya cuentan en el total pagado).</td></tr>`:'');
+  }
 
   renderDetalle(f);
   actualizarChips(f);
@@ -861,14 +922,15 @@ let historial=[];
 
 function analizarDatos(){
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale&&!m.esFijo);
+  const {gastosBase,gastos,dirs}=separarGastos(f);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const hoyStr=hoyISO();
   const total=gastos.reduce((a,m)=>a+m.monto,0);
+  const totalDir=sumaMonto(dirs);
   const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
-  const sinComp=gastos.filter(m=>!m.comprobante&&!m.causaRaiz);
-  const conAutor=gastos.filter(m=>m.autorizado);
-  const fijosPend=catalogoFijos.filter(c=>getSaldoFijo(c)>0);
+  const sinComp=gastosBase.filter(m=>!m.comprobante&&!m.causaRaiz);
+  const conAutor=gastosBase.filter(m=>m.autorizado);
+  const fm=fijosMes();
   const porSuc={};['CDMX','Morelos','Puebla'].forEach(s=>{
     const ms=gastos.filter(m=>m.sucursal===s);
     const msTotal=f.filter(m=>m.sucursal===s); // incluye bonificaciones
@@ -878,7 +940,7 @@ function analizarDatos(){
   const topTipo=Object.entries(porTipo).sort((a,b)=>b[1]-a[1]);
   const sinCapturarHoy=['CDMX','Morelos','Puebla'].filter(s=>porSuc[s].hoy===0);
   const bonifNoCuadran=bonifs.filter(m=>m.bonifCuadra==='No');
-  const gastosMayores=gastos.filter(m=>m.monto>=10000);
+  const gastosMayores=gastosBase.filter(m=>m.monto>=10000);
   const parrafos=[];
   if(gastos.length===0){
     parrafos.push('Sin movimientos capturados en el periodo seleccionado. Ajusta los filtros de fecha o espera a que las sucursales empiecen a capturar.');
@@ -890,6 +952,9 @@ function analizarDatos(){
     const pct=total>0?((topTipo[0][1]/total)*100).toFixed(0):0;
     parrafos.push(`La categoría con mayor peso es <strong>${topTipo[0][0]}</strong> con ${fmt(topTipo[0][1])} (${pct}% del gasto total del periodo).`);
   }
+  if(dirs.length>0){
+    parrafos.push(`Dirección/Socios (fuera del gasto operativo): <strong>${fmt(totalDir)}</strong> en ${dirs.length} movimiento(s) — ${detalleSucursales(dirs)}.`);
+  }
   if(bonifs.length>0){
     const alertaBonif=bonifNoCuadran.length>0?` <span style="color:#f0a0a0;">⚠ ${bonifNoCuadran.length} bonificación(es) NO cuadran con lo pactado — revisar con el área comercial.</span>`:'Todas cuadran con lo pactado ✓';
     parrafos.push(`Bonificaciones a clientes: <strong>${fmt(totalBonif)}</strong> en ${bonifs.length} registro(s). ${alertaBonif}`);
@@ -898,7 +963,7 @@ function analizarDatos(){
   if(sinComp.length>0) alertas.push(`<span style="color:#f0a0a0;">🚫 ${sinComp.length} gasto(s) sin comprobante ni causa raíz — requieren atención inmediata.</span>`);
   if(sinCapturarHoy.length>0) alertas.push(`<span style="color:#f0d080;">⏰ Las sucursales <strong>${sinCapturarHoy.join(', ')}</strong> no han capturado nada hoy.</span>`);
   if(gastosMayores.length>0) alertas.push(`<span style="color:#f0d080;">⚡ ${gastosMayores.length} gasto(s) mayores a $10,000 en el periodo — verificar autorizaciones.</span>`);
-  if(fijosPend.length>0) alertas.push(`<span style="color:#f0d080;">📋 ${fijosPend.length} gasto(s) fijo(s) pendientes de pago este mes (${fmt(fijosPend.reduce((a,c)=>a+(Number(c.monto)||0),0))}).</span>`);
+  if(fijosCargados&&fm.pendientes.length>0) alertas.push(`<span style="color:#f0d080;">📋 ${fm.pendientes.length} de ${fm.rows.length} gasto(s) fijo(s) sin pago capturado este mes (${fmt(fm.pendTotal)}). Ya pagados: ${fmt(fm.total)}.</span>`);
   if(conAutor.length>0) alertas.push(`<span style="color:#9eb8a8;">✓ ${conAutor.length} gasto(s) con autorización especial registrada.</span>`);
   if(alertas.length>0) parrafos.push(alertas.join('<br>'));
   if(sinComp.length===0&&sinCapturarHoy.length===0&&bonifNoCuadran.length===0){
@@ -910,7 +975,7 @@ function analizarDatos(){
 function responderPregunta(pregunta){
   const p=pregunta.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale&&!m.esFijo);
+  const {gastos,dirs}=separarGastos(f);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const hoyStr=hoyISO();
   const SUCURSALES=['CDMX','Morelos','Puebla'];
@@ -920,6 +985,12 @@ function responderPregunta(pregunta){
   const topSuc=(por)=>Object.entries(por).sort((a,b)=>b[1]-a[1]);
   const semanaISO=(offset=0)=>{const d=new Date();d.setDate(d.getDate()-d.getDay()+1+(offset*7));const f2=n=>String(n).padStart(2,'0');const a=d.getFullYear();const mes=f2(d.getMonth()+1);const dia=f2(d.getDate());return`${a}-${mes}-${dia}`;};
   const NO_DATO=`No tengo ese dato disponible con la información actual. Intenta con preguntas como:<br>· ¿Cuánto gastamos esta semana?<br>· ¿Qué sucursal gasta más?<br>· ¿Hay gastos sin comprobante?<br>· ¿Cuánto en viáticos?<br>· ¿Cómo van las bonificaciones?<br>· ¿Quién no ha capturado hoy?`;
+
+  // ── DIRECCIÓN / SOCIOS ──
+  if(p.includes('direccion')||p.includes('socio')){
+    if(!dirs.length) return 'No hay movimientos de Dirección/Socios en el periodo.';
+    return `<strong>Dirección/Socios</strong> (aparte del gasto operativo): <strong>${fmt(sumaMonto(dirs))}</strong> en ${dirs.length} movimientos.<br>${detalleSucursales(dirs)}`;
+  }
 
   // ── BARRA DE TOTALES ──
   if(p.includes('operacion')&&(p.includes('cuanto')||p.includes('total')||p.includes('area'))){
@@ -947,8 +1018,10 @@ function responderPregunta(pregunta){
     const totalOp=gastos.reduce((a,m)=>a+m.monto,0);
     const totalBn=bonifs.reduce((a,m)=>a+m.monto,0);
     const totalEf=efectivaleRegs.reduce((a,r)=>a+r.cargo,0);
-    const totalFj=catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0);
-    return `Total egresos del periodo:<br><strong>Operativo:</strong> ${fmt(totalOp)}<br><strong>Bonificaciones:</strong> ${fmt(totalBn)}<br><strong>Efectivale:</strong> ${fmt(totalEf)}<br><strong>Fijos:</strong> ${fmt(totalFj)}<br><strong>Gran total: ${fmt(totalOp+totalBn+totalEf+totalFj)}</strong>`;
+    const totalDr=sumaMonto(dirs);
+    const totalTg=tagRegs.reduce((a,r)=>a+(Number(r.importe)||0),0);
+    const totalFj=fijosMes().total;
+    return `Total egresos del periodo:<br><strong>Operativo:</strong> ${fmt(totalOp)}<br><strong>Dirección/Socios:</strong> ${fmt(totalDr)}<br><strong>Bonificaciones:</strong> ${fmt(totalBn)}<br><strong>Efectivale:</strong> ${fmt(totalEf)}<br><strong>TAG:</strong> ${fmt(totalTg)}<br><strong>Fijos pagados:</strong> ${fmt(totalFj)}<br><strong>Gran total: ${fmt(totalOp+totalDr+totalBn+totalEf+totalTg+totalFj)}</strong>`;
   }
 
   // ── HOY ──
@@ -1072,18 +1145,19 @@ function responderPregunta(pregunta){
 
   // ── GASTOS FIJOS ──
   if(p.includes('fijo')||p.includes('renta')){
-    const totFijos=catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0);
-    const pend=catalogoFijos.filter(c=>getSaldoFijo(c)>0);
-    const totPend=pend.reduce((a,c)=>a+(Number(c.monto)||0),0);
-    if(!totFijos) return 'No hay gastos fijos registrados para este mes.';
-    return `Gastos fijos del mes: <strong>${fmt(totFijos)}</strong><br>Pendientes: <strong style="color:#f0d080;">${fmt(totPend)}</strong> (${pend.length} conceptos)<br>Pagados: ${fmt(totFijos-totPend)}`;
+    const fm=fijosMes();
+    if(!fm.rows.length&&!fm.pagosMes.length) return 'No hay gastos fijos registrados para este mes.';
+    return `Gastos fijos pagados en el mes: <strong>${fmt(fm.total)}</strong> (${fm.pagosMes.length} pagos capturados)<br>Conceptos pagados: ${fm.pagadosN} de ${fm.rows.length}<br>Pendientes: <strong style="color:#f0d080;">${fmt(fm.pendTotal)}</strong> (${fm.pendientes.length} conceptos)${fm.sinCat.length?`<br>Pagos sin concepto en catálogo: ${fm.sinCat.length} por ${fmt(fm.sinCatTotal)}`:''}`;
   }
 
   // ── TOTAL / RESUMEN ──
   if(p.includes('total')||p.includes('cuanto')||p.includes('resumen')||p.includes('gastamos')||p.includes('llevamos')||p.includes('periodo')||p.includes('mes')){
     const total=gastos.reduce((a,m)=>a+m.monto,0);
     const totalBonif=bonifs.reduce((a,m)=>a+m.monto,0);
-    return `Periodo actual:<br><strong>Gasto operativo:</strong> ${fmt(total)} (${gastos.length} movimientos)<br><strong>Bonificaciones:</strong> ${fmt(totalBonif)} (${bonifs.length} registros)<br><strong>Total egresos:</strong> ${fmt(total+totalBonif+catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0))}`;
+    const totalDir=sumaMonto(dirs);
+    const totalEfx=efectivaleRegs.reduce((a,r)=>a+(Number(r.cargo)||0),0);
+    const totalTgx=tagRegs.reduce((a,r)=>a+(Number(r.importe)||0),0);
+    return `Periodo actual:<br><strong>Gasto operativo:</strong> ${fmt(total)} (${gastos.length} movimientos)<br><strong>Dirección/Socios:</strong> ${fmt(totalDir)} (${dirs.length} movimientos)<br><strong>Bonificaciones:</strong> ${fmt(totalBonif)} (${bonifs.length} registros)<br><strong>Total egresos:</strong> ${fmt(total+totalDir+totalBonif+totalEfx+totalTgx+fijosMes().total)}`;
   }
 
   // ── COMPROBANTES ──
@@ -1254,7 +1328,7 @@ function filaTotal(datos,cols){
 
 function generarReporte(tipo){
   const f=filtrar();
-  const gastos=f.filter(m=>m.tipo!=='Bonificación a cliente'&&!m.esEfectivale&&!m.esFijo);
+  const {gastos,dirs}=separarGastos(f);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const wb=XLSX.utils.book_new();
   const hoy2=hoyISO();
@@ -1266,12 +1340,13 @@ function generarReporte(tipo){
       {'Indicador':'Periodo analizado','Valor':periodoTxt},
       {'Indicador':'Sucursal','Valor':$('fSuc').value||'Todas'},
       {'Indicador':'Total gasto operativo','Valor':gastos.reduce((a,m)=>a+m.monto,0)},
+      {'Indicador':'Dirección/Socios (aparte del operativo)','Valor':sumaMonto(dirs)},
       {'Indicador':'Total bonificaciones (no gasto)','Valor':bonifs.reduce((a,m)=>a+m.monto,0)},
       {'Indicador':'Movimientos registrados','Valor':gastos.length},
       {'Indicador':'Sin comprobante ni causa raíz','Valor':gastos.filter(m=>!m.comprobante&&!m.causaRaiz).length},
       {'Indicador':'Con autorización especial','Valor':gastos.filter(m=>m.autorizado).length},
-      {'Indicador':'Gastos fijos del mes','Valor':catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0)},
-      {'Indicador':'Gastos fijos pendientes','Valor':catalogoFijos.reduce((a,c)=>a+getSaldoFijo(c),0)},
+      {'Indicador':'Gastos fijos pagados del mes','Valor':fijosMes().total},
+      {'Indicador':'Gastos fijos pendientes','Valor':fijosMes().pendTotal},
     ];
     const ws1=XLSX.utils.json_to_sheet(resumen);
     estiloCol(ws1,[35,20]);
@@ -1281,6 +1356,11 @@ function generarReporte(tipo){
     const ws2=XLSX.utils.json_to_sheet(det);
     estiloCol(ws2,[12,22,10,20,28,12,14,18,22,10]);
     XLSX.utils.book_append_sheet(wb,ws2,'Detalle gastos');
+    if(dirs.length){
+      const wsD=XLSX.utils.json_to_sheet(dirs.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Persona':m.persona||'','Concepto':m.concepto,'Monto':m.monto,'Capturó':m.capturista,'Autorizado por':m.autorizado||'','Comprobante':m.comprobante?'Sí':'No'})));
+      estiloCol(wsD,[12,10,20,28,12,14,18,10]);
+      XLSX.utils.book_append_sheet(wb,wsD,'Dirección-Socios');
+    }
     // HOJA 3: Bonificaciones
     if(bonifs.length){
       const db2=bonifs.map(m=>({'Fecha':m.fecha,'Sucursal':m.sucursal,'Cliente':m.bonifCliente||'','Cuenta':m.bonifCuenta||'','Desc%':m.bonifPct||'','Monto bonificado':m.monto,'¿Cuadra?':m.bonifCuadra||'','Folios':m.bonifFolios||'','Capturó':m.capturista}));
@@ -1377,24 +1457,25 @@ function generarReporte(tipo){
     XLSX.writeFile(wb,`SinComprobar_Ferregama_${hoy2}.xlsx`);
 
   } else if(tipo==='fijosvsvar'){
+    const fmx=fijosMes();
     const totalVar=gastos.reduce((a,m)=>a+m.monto,0);
-    const totalFijos=catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0);
-    const fijosPag=catalogoFijos.reduce((a,c)=>a+getPagadoFijo(c),0);
-    const fijosPend=totalFijos-fijosPag;
-    const totalGeneral=totalVar+totalFijos;
+    const totalDirx=sumaMonto(dirs);
+    const totalFijos=fmx.total;
+    const totalGeneral=totalVar+totalDirx+totalFijos;
+    const pct=v=>totalGeneral?((v/totalGeneral)*100).toFixed(1)+'%':'—';
     // resumen
     const res=[
-      {'Concepto':'Gasto variable (efectivo)','Monto':totalVar,'% del total':totalGeneral?((totalVar/totalGeneral)*100).toFixed(1)+'%':'—'},
-      {'Concepto':'Gastos fijos del mes','Monto':totalFijos,'% del total':totalGeneral?((totalFijos/totalGeneral)*100).toFixed(1)+'%':'—'},
-      {'Concepto':'   — Pagados','Monto':fijosPag,'% del total':''},
-      {'Concepto':'   — Pendientes','Monto':fijosPend,'% del total':''},
+      {'Concepto':'Gasto variable (efectivo, sin Dirección/Socios)','Monto':totalVar,'% del total':pct(totalVar)},
+      {'Concepto':'Dirección/Socios','Monto':totalDirx,'% del total':pct(totalDirx)},
+      {'Concepto':'Gastos fijos pagados del mes','Monto':totalFijos,'% del total':pct(totalFijos)},
       {'Concepto':'TOTAL EGRESOS DEL MES','Monto':totalGeneral,'% del total':'100%'},
+      {'Concepto':'Fijos pendientes por pagar (informativo, no suma al total)','Monto':fmx.pendTotal,'% del total':''},
     ];
     const ws1=XLSX.utils.json_to_sheet(res);
     estiloCol(ws1,[30,16,14]);
     XLSX.utils.book_append_sheet(wb,ws1,'Fijos vs Variables');
     // detalle fijos con estado
-    const detF=catalogoFijos.map(c=>({'Concepto':c.concepto,'Sucursal':c.sucursal,'Día de pago':c.dia||'—','Monto':c.monto,'Estado':estadosFijos[`${claveMes}_${c.id}`]||'pendiente','Mes':MESES[mesAct]+' '+anioAct}));
+    const detF=fmx.rows.map(r=>({'Concepto':r.c.concepto,'Sucursal':r.c.sucursal||'Sin asignar','Día de pago':r.c.dia||'—','Monto':r.monto,'Pagado':r.pagado,'Estado':r.estado,'Mes':fmx.mesStr}));
     const ws2=XLSX.utils.json_to_sheet(detF);
     estiloCol(ws2,[28,12,12,14,12,16]);
     XLSX.utils.book_append_sheet(wb,ws2,'Detalle gastos fijos');
@@ -1591,7 +1672,7 @@ function renderIndicadorSemanal(){
 
 function generarAnalisisCompleto(){
   const f=filtrar();
-  const gastos=f.filter(m=>!m.esEfectivale&&!m.esFijo&&!m.esTag&&m.tipo!=='Bonificación a cliente');
+  const {gastos,dirs}=separarGastos(f);
   const bonifs=f.filter(m=>m.tipo==='Bonificación a cliente');
   const desde=$('fDesde').value||'inicio';
   const hasta=$('fHasta').value||hoyISO();
@@ -1608,10 +1689,12 @@ function generarAnalisisCompleto(){
   const totalTag=tagRegs.reduce((a,r)=>a+r.importe,0);
   txt+=`RESUMEN GENERAL\n───────────────────────────────────────────\n`;
   txt+=`Gasto operativo:  ${fmt(totalOp)} (${gastos.length} mov.)\n`;
+  txt+=`Dirección/Socios: ${fmt(sumaMonto(dirs))} (${dirs.length} mov.) — aparte del operativo\n`;
   txt+=`Bonificaciones:   ${fmt(totalBn)} (${bonifs.length} reg.) — NO ES GASTO\n`;
   txt+=`Efectivale:       ${fmt(totalEf)}\n`;
   txt+=`TAG casetas:      ${fmt(totalTag)}\n`;
-  txt+=`TOTAL EGRESOS:    ${fmt(totalOp+totalEf+totalTag+catalogoFijos.reduce((a,c)=>a+(Number(c.monto)||0),0))}\n\n`;
+  txt+=`Fijos pagados:    ${fmt(fijosMes().total)} | pendientes ${fmt(fijosMes().pendTotal)}\n`;
+  txt+=`TOTAL EGRESOS:    ${fmt(totalOp+sumaMonto(dirs)+totalEf+totalTag+fijosMes().total)}\n\n`;
   const tipos=[...new Set([...gastos,...bonifs].map(m=>m.tipo))].sort();
   txt+=`DETALLE POR TIPO\n═══════════════════════════════════════════\n`;
   tipos.forEach(tipo=>{
