@@ -252,37 +252,37 @@ tr:hover td{background:#faf8f3;}
   <div style="background:linear-gradient(135deg,#141c18,#1e3028);border-radius:12px;margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));overflow:hidden;border:1px solid #2e5040;">
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Gasto operativo</div>
-      <div style="font-size:22px;font-weight:800;color:#fff;" id="totalOpBarra">$0</div>
+      <div style="font-size:20px;font-weight:800;color:#fff;" id="totalOpBarra">$0</div>
       <div style="font-size:11px;color:#9eb8a8;margin-top:3px;" id="totalOpMovBarra">0 movimientos</div>
     </div>
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Bonificaciones <span style="font-size:9px;background:rgba(255,255,255,.1);padding:1px 6px;border-radius:8px;font-weight:400;">no es gasto</span></div>
-      <div style="font-size:22px;font-weight:800;color:#f0a0a0;" id="totalBonifBarra">$0</div>
+      <div style="font-size:20px;font-weight:800;color:#f0a0a0;" id="totalBonifBarra">$0</div>
       <div style="font-size:11px;color:#9eb8a8;margin-top:3px;" id="totalBonifMovBarra">0 registros</div>
     </div>
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);background:rgba(200,160,32,.14);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#e8c860;margin-bottom:5px;">Dirección/Socios <span style="font-size:9px;background:rgba(200,160,32,.3);padding:1px 6px;border-radius:8px;font-weight:400;">aparte del operativo</span></div>
-      <div style="font-size:22px;font-weight:800;color:#e8c860;" id="totalDirBarra">$0</div>
+      <div style="font-size:20px;font-weight:800;color:#e8c860;" id="totalDirBarra">$0</div>
       <div style="font-size:11px;color:#e8c860;margin-top:3px;" id="totalDirDetBarra">Sin movimientos</div>
     </div>
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);background:rgba(46,125,69,.15);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#80d0a0;margin-bottom:5px;">Efectivale <span style="font-size:9px;background:rgba(46,125,69,.3);padding:1px 6px;border-radius:8px;font-weight:400;">gasolina</span></div>
-      <div style="font-size:22px;font-weight:800;color:#80d0a0;" id="totalEfectBarra">$0</div>
+      <div style="font-size:20px;font-weight:800;color:#80d0a0;" id="totalEfectBarra">$0</div>
       <div style="font-size:11px;color:#80d0a0;margin-top:3px;" id="totalEfectDetBarra">Sin recargas</div>
     </div>
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);background:rgba(123,63,196,.15);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#c8a0f0;margin-bottom:5px;">TAG <span style="font-size:9px;background:rgba(123,63,196,.3);padding:1px 6px;border-radius:8px;font-weight:400;">casetas</span></div>
-      <div style="font-size:22px;font-weight:800;color:#c8a0f0;" id="totalTagBarra">$0</div>
+      <div style="font-size:20px;font-weight:800;color:#c8a0f0;" id="totalTagBarra">$0</div>
       <div style="font-size:11px;color:#c8a0f0;margin-top:3px;" id="totalTagDetBarra">Sin peajes</div>
     </div>
     <div style="padding:14px 18px;border-right:1px solid rgba(255,255,255,.08);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#9eb8a8;margin-bottom:5px;">Gastos fijos del mes</div>
-      <div style="font-size:22px;font-weight:800;color:#fff;" id="totalFijosBarra">$0</div>
+      <div style="font-size:20px;font-weight:800;color:#fff;" id="totalFijosBarra">$0</div>
       <div style="font-size:11px;color:#f0c040;margin-top:3px;" id="totalFijosPendBarra">$0 pendientes</div>
     </div>
     <div style="padding:14px 18px;background:rgba(181,72,42,.2);">
       <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#f0b8a0;margin-bottom:5px;">Total egresos</div>
-      <div style="font-size:26px;font-weight:900;color:#fff;" id="totalEgresosBarra">$0</div>
+      <div style="font-size:21px;font-weight:900;color:#fff;overflow-wrap:anywhere;" id="totalEgresosBarra">$0</div>
       <div style="font-size:11px;color:#f0b8a0;margin-top:3px;">op + dirección + bonif + efect + TAG + fijos</div>
     </div>
   </div>
@@ -549,12 +549,13 @@ function suscribir(){
     tagRegs=snap.docs.map(d=>({id:d.id,...d.data()}));
     renderTodo();
   });
-  db.collection('fijos_catalogo').onSnapshot(snap=>{catalogoFijos=snap.docs.map(d=>({id:d.id,...d.data()}));renderTodo();});
-  db.collection('fijos_estados').doc('global').onSnapshot(doc=>{estadosFijos=doc.exists?doc.data():{};renderTodo();});
+  db.collection('fijos_catalogo').onSnapshot(snap=>{catalogoFijos=snap.docs.map(d=>({id:d.id,...d.data()}));renderTodo();try{analizarAuto();}catch(e){console.error('analizarAuto:',e);}});
+  db.collection('fijos_estados').doc('global').onSnapshot(doc=>{estadosFijos=doc.exists?doc.data():{};renderTodo();try{analizarAuto();}catch(e){console.error('analizarAuto:',e);}});
   db.collection('fijos_pagos').onSnapshot(snap=>{
     fijosPagosV4=snap.docs.map(d=>({id:d.id,...d.data()}));
     fijosCargados=true;
     renderTodo();
+    try{analizarAuto();}catch(e){console.error('analizarAuto:',e);}
   });
 }
 
@@ -676,7 +677,8 @@ function fijosMes(){
   return r;
 }
 function textoPendFijos(fm){
-  return`${fmt(fm.pendTotal)} pendientes · ${fm.sinPago.length} sin pago, ${fm.parciales.length} parciales`;
+  const sm=fm.sinPago.filter(x=>!x.monto).length;
+  return`${fmt(fm.pendTotal)} pendientes · ${fm.sinPago.length} sin pago${sm?` (${sm} sin monto en catálogo)`:''}, ${fm.parciales.length} parciales`;
 }
 
 /* RENDER PRINCIPAL */
@@ -832,7 +834,7 @@ function renderTodo(){
       const c=r.c;
       const label=r.estado==='pagado'?(r.nPagos?`Pagado · ${fmt(r.pagado)}`:'Pagado'):r.estado==='parcial'?`Parcial: ${fmt(r.pagado)} de ${fmt(r.monto)} · saldo ${fmt(r.saldo)}`:'Pendiente';
       return`<tr><td>${c.concepto}</td><td>${c.sucursal||'Sin asignar'}</td><td>${c.dia?'Día '+c.dia:'—'}</td><td class="ac">${fmt(r.monto)}</td><td><span class="ep ${r.estado}">${label}</span></td></tr>`;
-    }).join('')+(fm.sinCat.length?`<tr class="erow"><td colspan="5">Además hay ${fm.sinCat.length} pago(s) por ${fmt(fm.sinCatTotal)} capturados en el mes que no corresponden a ningún concepto del catálogo (ya cuentan en el total pagado).</td></tr>`:'');
+    }).join('')+(fm.sinCat.length?`<tr class="erow"><td colspan="5">Además hay ${fm.sinCat.length} pago(s) por ${fmt(fm.sinCatTotal)} capturados en el mes que no corresponden a ningún concepto del catálogo (ya cuentan en el total pagado): ${fm.sinCat.slice().sort((a,b)=>(Number(b.monto)||0)-(Number(a.monto)||0)).slice(0,15).map(p=>`${p.concepto||'(sin nombre)'}${p.sucursal?' · '+p.sucursal:''} ${fmt(p.monto)}`).join(' | ')}</td></tr>`:'');
   }
 
   renderDetalle(f);
