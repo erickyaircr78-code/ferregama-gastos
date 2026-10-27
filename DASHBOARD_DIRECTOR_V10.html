@@ -650,6 +650,7 @@ function fijosMes(){
     const monto=Number(c.monto)||0;
     let pagado=ps.reduce((a,p)=>a+(Number(p.monto)||0),0);
     let estado=ps.length?'pagado':'pendiente';
+    if(ps.length&&monto>0&&pagado+0.005<monto)estado='parcial'; // pago menor al monto del catálogo: queda saldo pendiente
     if(!ps.length){
       // respaldo: marca manual anterior (fijos_estados) cuando todavía no hay pago capturado
       const raw=estadosFijos[`${mesStr}_${c.id}`];
@@ -666,6 +667,7 @@ function fijosMes(){
     mesStr,rows,pagosMes,
     total:sumaMonto(pagosMes),                       // pagos capturados en el mes (lo que ya se pagó)
     pendientes,pendTotal:pendientes.reduce((a,x)=>a+x.saldo,0),
+    sinPago:pendientes.filter(x=>x.estado==='pendiente'),parciales:pendientes.filter(x=>x.estado==='parcial'),
     pagadosN:rows.length-pendientes.length,
     sinCat,sinCatTotal:sumaMonto(sinCat),
     sinMonto:pendientes.filter(x=>!x.monto).length
@@ -674,7 +676,7 @@ function fijosMes(){
   return r;
 }
 function textoPendFijos(fm){
-  return`${fmt(fm.pendTotal)} pendientes · ${fm.pendientes.length} de ${fm.rows.length} conceptos`;
+  return`${fmt(fm.pendTotal)} pendientes · ${fm.sinPago.length} sin pago, ${fm.parciales.length} parciales`;
 }
 
 /* RENDER PRINCIPAL */
@@ -705,7 +707,7 @@ function renderTodo(){
   const fijosPend=fm.pendTotal;
   if(fijosCargados){
     $('hPend').textContent=fmt(fm.pendTotal);
-    $('hPendSub').textContent=`${fm.pendientes.length} de ${fm.rows.length} conceptos · ${MESES[+fm.mesStr.substring(5,7)-1]||MESES[mesAct]} ${fm.mesStr.substring(0,4)}`;
+    $('hPendSub').textContent=`${fm.sinPago.length} sin pago · ${fm.parciales.length} parciales · ${MESES[+fm.mesStr.substring(5,7)-1]||MESES[mesAct]} ${fm.mesStr.substring(0,4)}`;
   }else{
     $('hPend').textContent='…';
     $('hPendSub').textContent='Cargando gastos fijos';
@@ -828,7 +830,7 @@ function renderTodo(){
   else{
     tbF.innerHTML=fm.rows.map(r=>{
       const c=r.c;
-      const label=r.estado==='pagado'?(r.nPagos?`Pagado · ${fmt(r.pagado)}`:'Pagado'):r.estado==='parcial'?`Parcial: ${fmt(r.pagado)} / ${fmt(r.monto)}`:'Pendiente';
+      const label=r.estado==='pagado'?(r.nPagos?`Pagado · ${fmt(r.pagado)}`:'Pagado'):r.estado==='parcial'?`Parcial: ${fmt(r.pagado)} de ${fmt(r.monto)} · saldo ${fmt(r.saldo)}`:'Pendiente';
       return`<tr><td>${c.concepto}</td><td>${c.sucursal||'Sin asignar'}</td><td>${c.dia?'Día '+c.dia:'—'}</td><td class="ac">${fmt(r.monto)}</td><td><span class="ep ${r.estado}">${label}</span></td></tr>`;
     }).join('')+(fm.sinCat.length?`<tr class="erow"><td colspan="5">Además hay ${fm.sinCat.length} pago(s) por ${fmt(fm.sinCatTotal)} capturados en el mes que no corresponden a ningún concepto del catálogo (ya cuentan en el total pagado).</td></tr>`:'');
   }
@@ -963,7 +965,7 @@ function analizarDatos(){
   if(sinComp.length>0) alertas.push(`<span style="color:#f0a0a0;">🚫 ${sinComp.length} gasto(s) sin comprobante ni causa raíz — requieren atención inmediata.</span>`);
   if(sinCapturarHoy.length>0) alertas.push(`<span style="color:#f0d080;">⏰ Las sucursales <strong>${sinCapturarHoy.join(', ')}</strong> no han capturado nada hoy.</span>`);
   if(gastosMayores.length>0) alertas.push(`<span style="color:#f0d080;">⚡ ${gastosMayores.length} gasto(s) mayores a $10,000 en el periodo — verificar autorizaciones.</span>`);
-  if(fijosCargados&&fm.pendientes.length>0) alertas.push(`<span style="color:#f0d080;">📋 ${fm.pendientes.length} de ${fm.rows.length} gasto(s) fijo(s) sin pago capturado este mes (${fmt(fm.pendTotal)}). Ya pagados: ${fmt(fm.total)}.</span>`);
+  if(fijosCargados&&fm.pendientes.length>0) alertas.push(`<span style="color:#f0d080;">📋 Gastos fijos: ${fm.sinPago.length} sin pago y ${fm.parciales.length} con pago parcial; saldo pendiente ${fmt(fm.pendTotal)}. Ya pagado: ${fmt(fm.total)}.</span>`);
   if(conAutor.length>0) alertas.push(`<span style="color:#9eb8a8;">✓ ${conAutor.length} gasto(s) con autorización especial registrada.</span>`);
   if(alertas.length>0) parrafos.push(alertas.join('<br>'));
   if(sinComp.length===0&&sinCapturarHoy.length===0&&bonifNoCuadran.length===0){
@@ -1147,7 +1149,7 @@ function responderPregunta(pregunta){
   if(p.includes('fijo')||p.includes('renta')){
     const fm=fijosMes();
     if(!fm.rows.length&&!fm.pagosMes.length) return 'No hay gastos fijos registrados para este mes.';
-    return `Gastos fijos pagados en el mes: <strong>${fmt(fm.total)}</strong> (${fm.pagosMes.length} pagos capturados)<br>Conceptos pagados: ${fm.pagadosN} de ${fm.rows.length}<br>Pendientes: <strong style="color:#f0d080;">${fmt(fm.pendTotal)}</strong> (${fm.pendientes.length} conceptos)${fm.sinCat.length?`<br>Pagos sin concepto en catálogo: ${fm.sinCat.length} por ${fmt(fm.sinCatTotal)}`:''}`;
+    return `Gastos fijos pagados en el mes: <strong>${fmt(fm.total)}</strong> (${fm.pagosMes.length} pagos capturados)<br>Conceptos pagados completos: ${fm.pagadosN} de ${fm.rows.length}<br>Saldo pendiente: <strong style="color:#f0d080;">${fmt(fm.pendTotal)}</strong> (${fm.sinPago.length} sin pago, ${fm.parciales.length} con pago parcial)${fm.sinCat.length?`<br>Pagos sin concepto en catálogo: ${fm.sinCat.length} por ${fmt(fm.sinCatTotal)}`:''}`;
   }
 
   // ── TOTAL / RESUMEN ──
@@ -1475,7 +1477,7 @@ function generarReporte(tipo){
     estiloCol(ws1,[30,16,14]);
     XLSX.utils.book_append_sheet(wb,ws1,'Fijos vs Variables');
     // detalle fijos con estado
-    const detF=fmx.rows.map(r=>({'Concepto':r.c.concepto,'Sucursal':r.c.sucursal||'Sin asignar','Día de pago':r.c.dia||'—','Monto':r.monto,'Pagado':r.pagado,'Estado':r.estado,'Mes':fmx.mesStr}));
+    const detF=fmx.rows.map(r=>({'Concepto':r.c.concepto,'Sucursal':r.c.sucursal||'Sin asignar','Día de pago':r.c.dia||'—','Monto':r.monto,'Pagado':r.pagado,'Saldo':r.saldo,'Estado':r.estado,'Mes':fmx.mesStr}));
     const ws2=XLSX.utils.json_to_sheet(detF);
     estiloCol(ws2,[28,12,12,14,12,16]);
     XLSX.utils.book_append_sheet(wb,ws2,'Detalle gastos fijos');
