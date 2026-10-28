@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Exportar Gastos Fijos · Ferregama</title>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--ink:#1a1714;--muted:#6a6560;--paper:#f4f2eb;--card:#fff;--line:#e2ddd4;--field:#f8f6f0;--accent:#b5482a;--ok:#2e7d45;--danger:#c0392b;--font:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;}
+body{font-family:var(--font);background:var(--paper);color:var(--ink);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px 26px;width:100%;max-width:440px;box-shadow:0 6px 30px rgba(0,0,0,.08);}
+h1{font-size:18px;font-weight:800;margin-bottom:4px;}
+p.sub{font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.45;}
+label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:5px;}
+input{width:100%;padding:11px 13px;border:1.5px solid var(--line);border-radius:8px;font-size:14px;font-family:var(--font);background:var(--field);margin-bottom:14px;}
+button{width:100%;padding:12px;background:linear-gradient(135deg,#b5482a,#8c3620);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);}
+button:disabled{opacity:.6;cursor:wait;}
+.err{color:var(--danger);font-size:12px;margin-bottom:10px;display:none;}
+.res{margin-top:16px;font-size:13px;line-height:1.6;display:none;background:var(--field);border-radius:8px;padding:12px 14px;}
+.res b{font-weight:700;}
+.nota{margin-top:14px;font-size:11px;color:var(--muted);line-height:1.45;}
+#panel{display:none;}
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>Exportar Gastos Fijos</h1>
+  <p class="sub">Solo lectura. Baja un Excel con el catálogo, todos los pagos y el uso de cada concepto. No modifica nada en el sistema.</p>
+
+  <div id="login">
+    <label>Usuario</label>
+    <input type="text" id="u" autocomplete="username">
+    <label>Contraseña</label>
+    <input type="password" id="p" autocomplete="current-password">
+    <div class="err" id="err"></div>
+    <button id="bLogin" onclick="entrar()">Entrar</button>
+  </div>
+
+  <div id="panel">
+    <div class="err" id="err2"></div>
+    <button id="bExp" onclick="exportar()">Descargar Excel</button>
+    <div class="res" id="res"></div>
+    <p class="nota">Solo el administrador puede usar esta página. El archivo contiene información financiera: guárdalo solo donde corresponda y no lo reenvíes.</p>
+  </div>
+</div>
+
+<script>
+const firebaseConfig={
+  apiKey:"AIzaSyAx6s8PpMOrPW4UzmyGOmz0_XmeAeawlrw",
+  authDomain:"ferregama-gastos.firebaseapp.com",
+  projectId:"ferregama-gastos",
+  storageBucket:"ferregama-gastos.appspot.com",
+  messagingSenderId:"561677307493",
+  appId:"1:561677307493:web:ferregamagastos"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+const $=id=>document.getElementById(id);
+const ZONAS=['CDMX','Morelos','Puebla','General'];
+
+function norm(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+function ts(v){
+  if(!v)return '';
+  try{
+    const d=v.toDate?v.toDate():(v.seconds?new Date(v.seconds*1000):new Date(v));
+    if(isNaN(d))return '';
+    return d.toLocaleString('sv-SE',{timeZone:'America/Mexico_City'}).slice(0,16);
+  }catch(e){return '';}
+}
+function zonaDe(c){
+  if(ZONAS.includes(c.sucursal))return c.sucursal;
+  if(ZONAS.includes(c.zona))return c.zona;
+  const w=norm(c.concepto).split(' ');
+  for(const z of ['CDMX','Morelos','Puebla']){if(w.includes(norm(z)))return z;}
+  return '';
+}
+
+async function entrar(){
+  const u=$('u').value.trim().toLowerCase(),p=$('p').value;
+  const err=$('err');err.style.display='none';
+  if(!u||!p){err.textContent='Completa usuario y contraseña.';err.style.display='block';return;}
+  $('bLogin').disabled=true;
+  try{
+    const doc=await db.collection('usuarios').doc(u).get();
+    const d=doc.exists?doc.data():null;
+    if(!d||d.pass!==p||d.estado==='inactivo'){err.textContent='Usuario o contraseña incorrectos.';err.style.display='block';$('bLogin').disabled=false;return;}
+    if(!(d.rol==='admin'||u==='erick')){err.textContent='Solo el administrador puede exportar.';err.style.display='block';$('bLogin').disabled=false;return;}
+    $('login').style.display='none';$('panel').style.display='block';
+  }catch(e){err.textContent='Error de conexión.';err.style.display='block';$('bLogin').disabled=false;}
+}
+$('p').addEventListener('keydown',e=>{if(e.key==='Enter')entrar();});
+
+async function exportar(){
+  const err=$('err2');err.style.display='none';
+  const btn=$('bExp');btn.disabled=true;btn.textContent='Leyendo datos...';
+  try{
+    // SOLO LECTURA: únicamente se usan .get()
+    const [cs,ps,es]=await Promise.all([
+      db.collection('fijos_catalogo').get(),
+      db.collection('fijos_pagos').get(),
+      db.collection('fijos_estados').doc('global').get()
+    ]);
+    const cat=cs.docs.map(d=>({id:d.id,...d.data()}));
+    const pagos=ps.docs.map(d=>({id:d.id,...d.data()}));
+    const estados=es.exists?es.data():{};
+
+    // ── Hoja Catálogo (crudo) ──
+    const hCat=cat.map(c=>({
+      ID:c.id,Concepto:c.concepto||'',Sección:c.seccion||'',Sucursal:c.sucursal||'',Zona:c.zona||'',
+      Monto:c.monto||0,Día:c.dia||'',Activo:c.activo===false?'NO':'SI',
+      Personalizado:c.personalizado===true?'SI':'',Botón:c.boton===true?'SI':(c.boton===false?'NO':''),
+      Origen:c.origen||'',Semanal:c.semanal===true?'SI':'',
+      'Creado por':c.agregadoPor||'','Creado en':ts(c.creadoEn),
+      'Editado por':c.editadoPor||'','Editado en':ts(c.editadoEn),Orden:c.orden||''
+    }));
+
+    // ── Hoja Pagos (crudo) ──
+    const hPag=pagos.map(p=>({
+      ID:p.id,Fecha:p.fecha||'',Mes:p.mes||'',Concepto:p.concepto||'',Tipo:p.tipo||'',Sucursal:p.sucursal||'',
+      Monto:p.monto||0,Capturó:p.capturista||'',Comprobante:p.comprobante?'SI':'NO',
+      'Causa raíz':p.causaRaiz||'',Semanal:p.semanal?'SI':'','Creado en':ts(p.creadoEn),
+      'Editado por':p.editadoPor||'','Editado en':ts(p.editadoEn)
+    })).sort((a,b)=>String(b.Fecha).localeCompare(String(a.Fecha)));
+
+    // ── Cruce catálogo ↔ pagos (mismo criterio que el Dashboard: por nombre) ──
+    const hoy=new Date();
+    const corte=new Date(hoy.getTime()-183*86400000).toISOString().slice(0,10);
+    const llavesPago=p=>[norm(p.concepto),norm((p.tipo||'')+' '+(p.sucursal||''))];
+    const porLlave={};
+    pagos.forEach((p,i)=>llavesPago(p).forEach(k=>{if(!k)return;(porLlave[k]=porLlave[k]||new Set()).add(i);}));
+    const pagoUsado=new Set();
+    const uso=cat.map(c=>{
+      const z=zonaDe(c);
+      const llaves=[norm(c.concepto)];if(z)llaves.push(norm(c.concepto+' '+z));
+      const idx=new Set();
+      llaves.forEach(k=>(porLlave[k]||[]).forEach(i=>idx.add(i)));
+      idx.forEach(i=>pagoUsado.add(i));
+      const ps=[...idx].map(i=>pagos[i]);
+      const fechas=ps.map(p=>p.fecha||(p.mes?p.mes+'-01':'')).filter(Boolean).sort();
+      const meses=new Set(ps.map(p=>p.mes||(p.fecha||'').slice(0,7)).filter(Boolean));
+      const rec=ps.filter(p=>(p.fecha||(p.mes?p.mes+'-01':''))>=corte);
+      return{
+        Concepto:c.concepto||'',Sucursal:z||'(sin asignar)',Activo:c.activo===false?'NO':'SI',
+        'Monto catálogo':c.monto||0,Personalizado:c.personalizado===true?'SI':'',Botón:c.boton===true?'SI':'',
+        'Creado por':c.agregadoPor||'','Creado en':ts(c.creadoEn),
+        'Pagos (total)':ps.length,'Meses con pago':meses.size,
+        'Primer pago':fechas[0]||'','Último pago':fechas[fechas.length-1]||'',
+        'Pagos últimos 6 meses':rec.length,
+        'Monto últimos 6 meses':Math.round(rec.reduce((a,p)=>a+(p.monto||0),0)*100)/100,
+        'Monto pagado histórico':Math.round(ps.reduce((a,p)=>a+(p.monto||0),0)*100)/100
+      };
+    }).sort((a,b)=>String(a.Concepto).localeCompare(String(b.Concepto)));
+
+    const sinCat=pagos.map((p,i)=>({p,i})).filter(x=>!pagoUsado.has(x.i)).map(x=>({
+      Fecha:x.p.fecha||'',Mes:x.p.mes||'',Concepto:x.p.concepto||'',Tipo:x.p.tipo||'',Sucursal:x.p.sucursal||'',
+      Monto:x.p.monto||0,Capturó:x.p.capturista||''
+    })).sort((a,b)=>String(b.Fecha).localeCompare(String(a.Fecha)));
+
+    const hEst=Object.keys(estados).sort().map(k=>({Clave:k,Valor:typeof estados[k]==='object'?JSON.stringify(estados[k]):String(estados[k])}));
+
+    const meses=[...new Set(pagos.map(p=>p.mes).filter(Boolean))].sort();
+    const hLeeme=[
+      {Dato:'Fecha de exportación',Valor:ts(hoy)},
+      {Dato:'Conceptos en catálogo',Valor:cat.length},
+      {Dato:'Conceptos activos',Valor:cat.filter(c=>c.activo!==false).length},
+      {Dato:'Pagos registrados (todos los meses)',Valor:pagos.length},
+      {Dato:'Meses con pagos',Valor:meses.length?meses[0]+' a '+meses[meses.length-1]:'ninguno'},
+      {Dato:'Pagos sin concepto en el catálogo',Valor:sinCat.length},
+      {Dato:'Cómo se cruzan pagos y catálogo',Valor:'Por nombre (sin acentos ni mayúsculas): el concepto del pago, o su tipo + sucursal, contra el nombre del concepto del catálogo.'},
+      {Dato:'Pagos últimos 6 meses',Valor:'Desde '+corte},
+      {Dato:'Hojas',Valor:'Catalogo (crudo) · Uso por concepto (cruce) · Pagos (crudo) · Pagos sin catalogo · Estados manuales'}
+    ];
+
+    const wb=XLSX.utils.book_new();
+    const add=(rows,name,cols)=>{
+      const ws=XLSX.utils.json_to_sheet(rows.length?rows:[{'(vacío)':''}]);
+      if(cols)ws['!cols']=cols.map(w=>({wch:w}));
+      XLSX.utils.book_append_sheet(wb,ws,name);
+    };
+    add(hLeeme,'LEEME',[36,90]);
+    add(hCat,'Catalogo',[22,34,13,11,10,12,6,7,13,7,10,8,12,17,12,17,7]);
+    add(uso,'Uso por concepto',[34,14,7,14,13,7,12,17,11,13,12,12,14,16,17]);
+    add(hPag,'Pagos',[22,12,9,34,24,10,13,12,11,28,8,17,12,17]);
+    add(sinCat,'Pagos sin catalogo',[12,9,34,24,10,13,12]);
+    add(hEst,'Estados manuales',[26,50]);
+    XLSX.writeFile(wb,'FIJOS_CATALOGO_Y_USO_'+hoy.toISOString().slice(0,10)+'.xlsx');
+
+    const r=$('res');
+    r.innerHTML='<b>Listo. Se descargó el Excel.</b><br>Catálogo: '+cat.length+' conceptos ('+cat.filter(c=>c.activo!==false).length+' activos)<br>Pagos: '+pagos.length+(meses.length?' ('+meses[0]+' a '+meses[meses.length-1]+')':'')+'<br>Pagos sin concepto en el catálogo: '+sinCat.length;
+    r.style.display='block';
+  }catch(e){
+    err.textContent='No se pudo leer la información. Revisa tu conexión e intenta de nuevo.';err.style.display='block';
+  }finally{
+    btn.disabled=false;btn.textContent='Descargar Excel';
+  }
+}
+</script>
+</body>
+</html>
