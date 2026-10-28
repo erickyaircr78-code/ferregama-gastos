@@ -197,6 +197,29 @@ tr:hover td{background:#fafaf8;}
     <!-- TAB CAPTURA -->
     <div id="viewCaptura" class="view active">
 
+      <div class="section" id="secBusca">
+        <div class="sec-title">¿No ves el concepto? Búscalo aquí</div>
+        <input type="text" id="buscaConc" placeholder="Escribe el nombre: nómina semana, telcel, renta..." autocomplete="off" oninput="buscarConcepto()" style="width:100%;padding:10px 12px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
+        <div id="resBusca"></div>
+        <div id="blockBusca" style="display:none;margin-top:10px;padding:10px 12px;border:1.5px solid var(--accent);border-radius:8px;background:var(--field);">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <strong id="busNombre" style="font-size:13px;"></strong>
+            <button class="btn-sec" style="padding:3px 10px;font-size:11px;" onclick="limpiarBusca();limpiarForm();">Cambiar</button>
+          </div>
+          <div style="margin-top:8px;max-width:260px;">
+            <label style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:4px;">Sucursal *</label>
+            <select id="zonaBusca" onchange="cambiarZonaBusca()" style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--card);">
+              <option value="">Elige la sucursal</option>
+              <option value="CDMX">CDMX</option>
+              <option value="Morelos">Morelos</option>
+              <option value="Puebla">Puebla</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+          <div id="infoBusca" style="font-size:11px;color:var(--muted);margin-top:8px;"></div>
+        </div>
+      </div>
+
       <div class="section">
         <div class="sec-title">Tipo de gasto fijo</div>
 
@@ -322,10 +345,25 @@ tr:hover td{background:#fafaf8;}
           <input type="number" id="nuevoMonto" placeholder="0.00" step="0.01" min="0" style="width:100%;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:var(--font);background:var(--field);">
         </div>
       </div>
+      <div id="wrapNuevoBoton" style="display:none;align-items:center;gap:8px;margin-bottom:14px;">
+        <input type="checkbox" id="nuevoBoton" style="width:16px;height:16px;">
+        <label for="nuevoBoton" style="font-size:12px;font-weight:600;cursor:pointer;">Mostrar como botón en Capturar <span style="font-weight:400;color:var(--muted);">(solo para lo que se paga seguido; si no, se encuentra con el buscador)</span></label>
+      </div>
       <div style="display:flex;gap:8px;margin-bottom:16px;">
         <button class="btn-guardar" id="btnGuardarConcepto" style="margin:0;flex:1;" onclick="guardarConcepto()">Agregar</button>
         <button class="btn-sec" id="btnCancelarEdicion" style="margin:0;display:none;" onclick="cancelarEdicionConcepto()">Cancelar</button>
       </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <input type="text" id="filtroCat" placeholder="Buscar en el catálogo..." oninput="renderCatalogo()" style="flex:1;min-width:160px;padding:8px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-family:var(--font);background:var(--field);">
+          <select id="modoCat" onchange="renderCatalogo()" style="padding:8px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:12px;font-family:var(--font);background:var(--field);">
+            <option value="todos">Todos</option>
+            <option value="activos">Solo activos</option>
+            <option value="inactivos">Dados de baja</option>
+            <option value="boton">Con botón en Capturar</option>
+            <option value="sinmonto">Sin monto</option>
+          </select>
+        </div>
+        <div id="resumenCat" style="font-size:11px;color:var(--muted);margin-bottom:8px;"></div>
         <div id="listaCatalogo"></div>
       </div>
     </div>
@@ -399,6 +437,8 @@ let tipoSel=null;
 let zonaSel=null;
 let conceptoFinal=null;
 let editandoId=null;
+let cxSel=null;           // concepto elegido con el buscador (del catálogo)
+let nuevoConcNombre=null; // concepto escrito a mano que aún no existe en el catálogo
 
 // Usuarios que NO necesitan selector de zona (su zona es automática)
 function esSoloZona(){return sesion&&sesion.rol==='capturista'&&sesion.user!=='claudia'&&sesion.sucursal&&sesion.sucursal!=='todas';}
@@ -461,9 +501,9 @@ function iniciarSesion(){
   if(esAdmin()||sesion.user==='claudia') $('tabMasiva').style.display='inline-block';
   // Nota catálogo
   $('notaCat').textContent=esSoloZona()?
-    `Escribe el nombre, elige la sección y la zona. El botón aparece de inmediato.`:
-    'Escribe el nombre, elige en qué sección quieres que aparezca el botón y si aplica a una zona específica.';
-    'Agrega o elimina conceptos del catálogo. Aplica para todos los usuarios.';
+    'Escribe el nombre, elige la sección y la zona. Lo encuentras siempre con el buscador de Capturar.':
+    'Un concepto nuevo NO crea botón: se encuentra con el buscador de Capturar. Marca "Mostrar como botón" solo para lo que se paga seguido.';
+  $('wrapNuevoBoton').style.display=(esAdmin()||sesion.user==='claudia')?'flex':'none';
   // Fecha de hoy
   $('fFecha').value=hoyISO();
   // Construir botones
@@ -552,7 +592,7 @@ function construirBotones(){
   }
 
   // ── CONCEPTOS PERSONALIZADOS DEL CATÁLOGO ──
-  const personalizados=catalogo.filter(cx=>cx.personalizado===true&&cx.activo!==false);
+  const personalizados=catalogo.filter(cxMuestraBoton);
   if(personalizados.length){
     const grpNomina=personalizados.filter(cx=>cx.seccion==='nomina');
     const grpServicios=personalizados.filter(cx=>cx.seccion==='servicios');
@@ -577,6 +617,15 @@ function construirBotones(){
   // Selector de zona para nómina/servicios
   $('zonaNomina').innerHTML=zonaHTML('zonaNomina');
   $('zonaServicios').innerHTML=zonaHTML('zonaServicios');
+}
+
+// Un concepto del catálogo sale como botón extra solo si está activo y:
+//  - tiene boton:true, o
+//  - es anterior a este cambio (personalizado y sin campo boton): se respeta como estaba.
+function cxMuestraBoton(cx){
+  if(cx.activo===false)return false;
+  if(cx.boton===true)return true;
+  return cx.boton===undefined&&cx.personalizado===true;
 }
 
 function btnHTML(t){
@@ -616,6 +665,7 @@ document.addEventListener('click',function(e){
 
 // ── SELECCIÓN DE TIPO ──
 function selTipo(concepto,conZona,tipoCls){
+  limpiarBusca();
   // Deseleccionar todos
   document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
   // Seleccionar el presionado por data-concepto
@@ -667,11 +717,147 @@ function selZona(btn,zona,wrapId){
 
 function actualizarLabel(){
   if(!tipoSel){$('conceptoLabel').classList.remove('show');$('formSection').style.display='none';return;}
-  if(CON_ZONA.includes(tipoSel)&&!zonaSel){$('conceptoLabel').classList.remove('show');$('formSection').style.display='none';return;}
+  const viaBusca=!!(cxSel||nuevoConcNombre);
+  if(viaBusca&&!zonaSel){$('conceptoLabel').classList.remove('show');$('formSection').style.display='none';return;}
+  if(!viaBusca&&CON_ZONA.includes(tipoSel)&&!zonaSel){$('conceptoLabel').classList.remove('show');$('formSection').style.display='none';return;}
   $('conceptoLabel').classList.add('show');
   $('conceptoNombre').textContent=conceptoFinal||tipoSel;
-  $('semanalPill').style.display=SEMANALES.includes(tipoSel)?'inline-block':'none';
+  $('semanalPill').style.display=(SEMANALES.includes(tipoSel)||(cxSel&&cxSel.semanal===true))?'inline-block':'none';
   $('formSection').style.display='block';
+}
+
+// ── BUSCADOR DE CONCEPTOS ──
+const ZONAS_VALIDAS=['CDMX','Morelos','Puebla','General'];
+function normTxt(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/\s+/g,' ').trim();}
+function escH(s){return String(s==null?'':s).replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));}
+
+// Sucursal de un concepto: la del catálogo o, si falta, la que dice su nombre ("Agua Morelos")
+function zonaDeConcepto(c){
+  if(ZONAS_VALIDAS.includes(c.sucursal))return c.sucursal;
+  if(ZONAS_VALIDAS.includes(c.zona))return c.zona;
+  const palabras=normTxt(c.concepto).split(' ');
+  for(const z of ['CDMX','Morelos','Puebla']){if(palabras.includes(normTxt(z)))return z;}
+  return '';
+}
+function puedeVerConcepto(c){
+  if(c.activo===false)return false;
+  const priv=esAdmin()||sesion.user==='claudia';
+  if(!priv&&(c.seccion==='corporativos'||CORPORATIVOS.includes(c.concepto)))return false;
+  if(esSoloZona()){const z=zonaDeConcepto(c);if(z&&z!==miZona())return false;}
+  return true;
+}
+
+function buscarConcepto(){
+  const box=$('resBusca');
+  const texto=$('buscaConc').value.replace(/\s+/g,' ').trim();
+  const q=normTxt(texto);
+  if(!q){box.innerHTML='';return;}
+  const toks=q.split(' ');
+  const hits=catalogo
+    .filter(c=>puedeVerConcepto(c)&&toks.every(t=>normTxt(c.concepto).includes(t)))
+    .sort((a,b)=>a.concepto.localeCompare(b.concepto)).slice(0,8);
+  const exacto=catalogo.find(c=>normTxt(c.concepto)===q);
+  const rowSt='display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;padding:9px 12px;border:1px solid var(--line);border-radius:8px;margin-top:5px;background:var(--card);cursor:pointer;font-family:var(--font);font-size:13px;color:var(--ink);';
+  let html=hits.map(c=>{
+    const z=zonaDeConcepto(c);
+    const m=c.monto?fmt(c.monto):'sin monto';
+    const verZona=!z?'sin sucursal':(normTxt(c.concepto).split(' ').includes(normTxt(z))?'':z);
+    return `<button type="button" style="${rowSt}" onclick="elegirConceptoCat('${c.id}')"><span style="font-weight:600;">${escH(c.concepto)}</span><span style="font-size:11px;color:var(--muted);white-space:nowrap;">${verZona?escH(verZona)+' · ':''}${m}</span></button>`;
+  }).join('');
+  if(!hits.length&&exacto&&exacto.activo===false){
+    html+=`<div style="font-size:12px;color:var(--danger);margin-top:8px;">"${escH(exacto.concepto)}" está dado de baja. Pídele a Claudia que lo reactive en Catálogo.</div>`;
+  }else if(!exacto&&texto.length>=3&&!hits.length){
+    html+=`<button type="button" style="${rowSt}border-style:dashed;" onclick="elegirConceptoNuevo()"><span style="font-weight:600;">+ Usar "${escH(texto)}" como concepto nuevo</span><span style="font-size:11px;color:var(--muted);">se agrega al catálogo</span></button>`;
+  }else if(!exacto&&texto.length>=3){
+    html+=`<button type="button" style="background:none;border:none;padding:8px 2px 0;font-size:12px;color:var(--accent);cursor:pointer;font-family:var(--font);text-decoration:underline;" onclick="elegirConceptoNuevo()">¿No es ninguno? Usar "${escH(texto)}" como concepto nuevo</button>`;
+  }else if(!hits.length){
+    html+=`<div style="font-size:12px;color:var(--muted);margin-top:8px;">Sin resultados.</div>`;
+  }
+  box.innerHTML=html;
+}
+
+function prepararBusca(nombre,zona){
+  document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
+  $('zonaNomina').classList.remove('show');$('zonaServicios').classList.remove('show');
+  tipoSel=nombre;conceptoFinal=nombre;
+  let z=zona||'';
+  if(esSoloZona())z=miZona();
+  const sel=$('zonaBusca');
+  sel.value=ZONAS_VALIDAS.includes(z)?z:'';
+  sel.disabled=esSoloZona();
+  zonaSel=sel.value||null;
+  $('busNombre').textContent=nombre;
+  $('blockBusca').style.display='block';
+  $('resBusca').innerHTML='';
+  $('buscaConc').value='';
+  infoBusca();
+  actualizarLabel();
+  irAlFormulario();
+}
+
+// Con la lista de botones arriba, el formulario queda lejos: lo acercamos
+function irAlFormulario(){
+  if($('formSection').style.display==='block'){
+    setTimeout(()=>{try{$('conceptoLabel').scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}},50);
+  }
+}
+
+function elegirConceptoCat(id){
+  const c=catalogo.find(x=>x.id===id);
+  if(!c)return;
+  cxSel=c;nuevoConcNombre=null;
+  prepararBusca(c.concepto,zonaDeConcepto(c));
+}
+
+function elegirConceptoNuevo(){
+  const nombre=$('buscaConc').value.replace(/\s+/g,' ').trim().slice(0,80);
+  if(nombre.length<3)return;
+  if(catalogo.find(c=>normTxt(c.concepto)===normTxt(nombre))){buscarConcepto();return;}
+  cxSel=null;nuevoConcNombre=nombre;
+  prepararBusca(nombre,'');
+}
+
+function cambiarZonaBusca(){
+  zonaSel=$('zonaBusca').value||null;
+  infoBusca();
+  actualizarLabel();
+  irAlFormulario();
+}
+
+function infoBusca(){
+  const el=$('infoBusca');
+  if(nuevoConcNombre){
+    el.textContent='Concepto nuevo: se guarda el pago y se agrega al catálogo (sin botón y sin monto). Después Claudia puede ponerle monto en Catálogo.';
+    return;
+  }
+  if(!cxSel){el.textContent='';return;}
+  const mes=`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;
+  const n=normTxt(cxSel.concepto);
+  const pagado=pagos.filter(p=>p.mes===mes&&normTxt(p.concepto)===n).reduce((a,p)=>a+(p.monto||0),0);
+  const partes=[cxSel.monto?`Monto en catálogo: ${fmt(cxSel.monto)}`:'Sin monto en catálogo'];
+  partes.push(`Pagado este mes: ${fmt(pagado)}`);
+  if(cxSel.monto&&pagado<cxSel.monto)partes.push(`Saldo: ${fmt(cxSel.monto-pagado)}`);
+  el.textContent=partes.join(' · ');
+}
+
+function limpiarBusca(){
+  cxSel=null;nuevoConcNombre=null;
+  if($('buscaConc'))$('buscaConc').value='';
+  if($('resBusca'))$('resBusca').innerHTML='';
+  if($('blockBusca'))$('blockBusca').style.display='none';
+}
+
+// Alta silenciosa en el catálogo cuando el concepto se escribió a mano (sin botón y sin monto)
+async function crearConceptoDesdeCaptura(nombre,zona){
+  try{
+    if(catalogo.find(c=>normTxt(c.concepto)===normTxt(nombre)))return;
+    await db.collection('fijos_catalogo').add({
+      concepto:nombre,seccion:'servicios',sucursal:zona||'',zona:zona||'',monto:0,conZona:false,
+      activo:true,semanal:false,orden:catalogo.length+1,agregadoPor:sesion.user,
+      personalizado:true,boton:false,origen:'captura',
+      creadoEn:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){toast('El pago se guardó, pero no se pudo agregar al catálogo. Avísale a Claudia.');}
 }
 
 // ── COMPROBANTE ──
@@ -719,7 +905,9 @@ async function guardarPago(){
   const mes=`${anioAct}-${String(mesAct+1).padStart(2,'0')}`;
 
   // Anti-duplicado SOLO para no semanales
-  if(!SEMANALES.includes(tipoSel)){
+  const esSemanal=SEMANALES.includes(tipoSel)||(cxSel&&cxSel.semanal===true);
+  if((cxSel||nuevoConcNombre)&&!zonaSel){err.textContent='Elige la sucursal del pago.';err.style.display='block';return;}
+  if(!esSemanal){
     const existe=pagos.find(p=>p.concepto===concepto&&p.sucursal===sucursal&&p.mes===mes&&p.fecha===fecha);
     if(existe){err.textContent='Ya existe un pago de este concepto para esta sucursal en esta fecha.';err.style.display='block';return;}
   }
@@ -734,9 +922,10 @@ async function guardarPago(){
       comprobante:compFile?true:false,
       causaRaiz:sinComp?causa:'',
       tipo:tipoSel,
-      semanal:SEMANALES.includes(tipoSel),
+      semanal:!!esSemanal,
       creadoEn:firebase.firestore.FieldValue.serverTimestamp()
     });
+    if(nuevoConcNombre)await crearConceptoDesdeCaptura(nuevoConcNombre,sucursal);
     toast(`✓ ${concepto} — ${fmt(monto)}`);
     limpiarForm();
     showTab('lista',document.querySelector('[data-tab="lista"]'));
@@ -754,6 +943,7 @@ function limpiarForm(){
   $('compInput').value='';$('sinComp').checked=false;$('causaWrap').classList.remove('show');
   $('formErr').style.display='none';
   tipoSel=null;zonaSel=null;conceptoFinal=null;
+  limpiarBusca();
   document.querySelectorAll('.tipo-btn').forEach(b=>b.classList.remove('active'));
   $('zonaNomina').classList.remove('show');$('zonaServicios').classList.remove('show');
   $('conceptoLabel').classList.remove('show');$('formSection').style.display='none';
@@ -909,24 +1099,48 @@ function verComprobante(id){
 // ── CATÁLOGO ──
 function renderCatalogo(){
   const lista=$('listaCatalogo');
-  if(!catalogo.length){lista.innerHTML='<div class="empty">Sin conceptos en el catálogo.</div>';return;}
+  if(!catalogo.length){lista.innerHTML='<div class="empty">Sin conceptos en el catálogo.</div>';$('resumenCat').textContent='';return;}
   const puedeEditar=esAdmin()||sesion.user==='claudia';
-  lista.innerHTML=catalogo.map(c=>{
+  const q=normTxt($('filtroCat').value);
+  const modo=$('modoCat').value;
+  const activos=catalogo.filter(c=>c.activo!==false).length;
+  const conBoton=catalogo.filter(cxMuestraBoton).length;
+  const filtrados=catalogo.filter(c=>{
+    if(q&&!q.split(' ').every(t=>normTxt(c.concepto).includes(t)))return false;
+    if(modo==='activos')return c.activo!==false;
+    if(modo==='inactivos')return c.activo===false;
+    if(modo==='boton')return cxMuestraBoton(c);
+    if(modo==='sinmonto')return c.activo!==false&&!c.monto;
+    return true;
+  });
+  $('resumenCat').textContent=`${catalogo.length} conceptos · ${activos} activos · ${catalogo.length-activos} dados de baja · ${conBoton} con botón extra en Capturar. Mostrando ${filtrados.length}.`;
+  if(!filtrados.length){lista.innerHTML='<div class="empty">Sin resultados.</div>';return;}
+  lista.innerHTML=filtrados.map(c=>{
     const inactivo=c.activo===false;
+    const tieneBoton=cxMuestraBoton(c);
     const detalle=[c.sucursal||c.zona||'Sin zona',c.monto?fmt(c.monto):'Sin monto'].join(' · ');
+    const nom=c.concepto.replace(/'/g,"\\'");
     return `
     <div class="cat-item" style="${inactivo?'opacity:.5;':''}">
       <div>
-        <span style="font-size:13px;font-weight:600;">${c.concepto}</span>${inactivo?' <span style="font-size:10px;color:var(--danger);font-weight:700;">INACTIVO</span>':''}
-        <div style="font-size:11px;color:var(--muted);">${detalle}</div>
+        <span style="font-size:13px;font-weight:600;">${escH(c.concepto)}</span>${inactivo?' <span style="font-size:10px;color:var(--danger);font-weight:700;">INACTIVO</span>':''}${tieneBoton?' <span style="font-size:10px;color:var(--accent);font-weight:700;">BOTÓN</span>':''}
+        <div style="font-size:11px;color:var(--muted);">${escH(detalle)}</div>
       </div>
       ${puedeEditar?`<div style="display:flex;gap:4px;">
+        ${inactivo?'':`<button class="ibtn" title="${tieneBoton?'Quitar el botón de Capturar (el concepto sigue en el catálogo y en el buscador)':'Poner como botón en Capturar'}" onclick="toggleBotonConcepto('${c.id}',${tieneBoton},'${nom}')">${tieneBoton?'▣':'▢'}</button>`}
         <button class="ibtn" title="Editar" onclick="editarConcepto('${c.id}')">✎</button>
-        <button class="ibtn" title="${inactivo?'Reactivar':'Dar de baja'}" onclick="toggleActivoConcepto('${c.id}',${c.activo!==false},'${c.concepto.replace(/'/g,"\\'")}')">${inactivo?'↺':'⏻'}</button>
-        <button class="ibtn" title="Eliminar permanentemente" onclick="eliminarConcepto('${c.id}','${c.concepto.replace(/'/g,"\\'")}')">✕</button>
+        <button class="ibtn" title="${inactivo?'Reactivar':'Dar de baja'}" onclick="toggleActivoConcepto('${c.id}',${c.activo!==false},'${nom}')">${inactivo?'↺':'⏻'}</button>
+        <button class="ibtn" title="Eliminar permanentemente" onclick="eliminarConcepto('${c.id}','${nom}')">✕</button>
       </div>`:''}
     </div>`;
   }).join('');
+}
+
+async function toggleBotonConcepto(id,tieneBoton,nombre){
+  try{
+    await db.collection('fijos_catalogo').doc(id).update({boton:!tieneBoton});
+    toast(tieneBoton?`"${nombre}" ya no sale como botón. Sigue en el catálogo y en el buscador.`:`"${nombre}" ahora sale como botón en Capturar.`);
+  }catch(e){toast('Error al cambiar el botón.');}
 }
 
 async function guardarConcepto(){
@@ -934,6 +1148,8 @@ async function guardarConcepto(){
   const seccion=$('nuevaSeccion')?$('nuevaSeccion').value:'servicios';
   const sucursal=$('nuevaZona')?$('nuevaZona').value:'';
   const monto=parseFloat($('nuevoMonto').value)||0;
+  const puedeBoton=esAdmin()||sesion.user==='claudia';
+  const boton=puedeBoton&&$('nuevoBoton').checked;
   if(!nombre){toast('Escribe el nombre del concepto.');return;}
   if(!seccion){toast('Selecciona la sección.');return;}
   const conZona=['nomina','servicios'].includes(seccion);
@@ -948,6 +1164,7 @@ async function guardarConcepto(){
         zona:sucursal||'', // se mantiene por compatibilidad, ya no se usa para nada nuevo
         monto:monto,
         conZona:conZona,
+        ...(puedeBoton?{boton:boton}:{}),
         editadoPor:sesion.user,
         editadoEn:firebase.firestore.FieldValue.serverTimestamp()
       });
@@ -973,11 +1190,11 @@ async function guardarConcepto(){
       orden:catalogo.length+1,
       agregadoPor:sesion.user,
       personalizado:true,
+      boton:boton,
       creadoEn:firebase.firestore.FieldValue.serverTimestamp()
     });
-    $('nuevoConc').value='';$('nuevoMonto').value='';
-    toast(`✓ "${nombre}" agregado en ${seccion}.`);
-    // construirBotones se llama automáticamente por el onSnapshot
+    $('nuevoConc').value='';$('nuevoMonto').value='';$('nuevoBoton').checked=false;
+    toast(boton?`✓ "${nombre}" agregado, con botón en Capturar.`:`✓ "${nombre}" agregado al catálogo. Lo encuentras con el buscador de Capturar.`);
   }catch(e){toast('Error al agregar.');}
 }
 
@@ -989,6 +1206,7 @@ function editarConcepto(id){
   if($('nuevaSeccion'))$('nuevaSeccion').value=c.seccion||'servicios';
   if($('nuevaZona'))$('nuevaZona').value=c.sucursal||c.zona||'';
   $('nuevoMonto').value=c.monto||'';
+  $('nuevoBoton').checked=cxMuestraBoton(c);
   $('btnGuardarConcepto').textContent='Guardar cambios';
   $('btnCancelarEdicion').style.display='inline-block';
   $('nuevoConc').scrollIntoView({behavior:'smooth',block:'center'});
@@ -998,6 +1216,7 @@ function cancelarEdicionConcepto(){
   editandoId=null;
   $('nuevoConc').value='';$('nuevoMonto').value='';
   if($('nuevaZona'))$('nuevaZona').value='';
+  $('nuevoBoton').checked=false;
   $('btnGuardarConcepto').textContent='Agregar';
   $('btnCancelarEdicion').style.display='none';
 }
@@ -1005,7 +1224,7 @@ function cancelarEdicionConcepto(){
 async function toggleActivoConcepto(id,activoActual,nombre){
   const nuevoEstado=!activoActual;
   const accion=nuevoEstado?'reactivar':'dar de baja';
-  if(!confirm(`¿${nuevoEstado?'Reactivar':'Dar de baja'} "${nombre}"? ${nuevoEstado?'Volverá a aparecer como botón de captura.':'Ya no aparecerá como botón de captura, pero conserva su historial de pagos.'}`))return;
+  if(!confirm(`¿${nuevoEstado?'Reactivar':'Dar de baja'} "${nombre}"? ${nuevoEstado?'Volverá a salir en el buscador (y como botón si lo tenía).':'Dejará de salir en el buscador y como botón extra. Sus pagos y saldos no se mueven.'}`))return;
   try{
     await db.collection('fijos_catalogo').doc(id).update({activo:nuevoEstado});
     toast(`"${nombre}" ${nuevoEstado?'reactivado':'dado de baja'}.`);
